@@ -412,7 +412,7 @@ function FourSteps() {
       title: "Услуги и цены",
       body: "Направления работы, описание приёмов, их продолжительность и стоимость.",
       to: "/services",
-      image: "/media/session-01.jpg",
+      image: "/media/session-neutral-01.jpg",
     },
     {
       title: "Дипломы",
@@ -424,7 +424,7 @@ function FourSteps() {
       title: "Запись на приём",
       body: "Контакты, адрес и время приёма — всё необходимое, чтобы связаться с Анной.",
       to: "/contact",
-      image: "/media/session-02.jpg",
+      image: "/media/session-neutral-02.jpg",
     },
   ];
   useEffect(() => {
@@ -580,7 +580,7 @@ function PageLinks() {
       <p>{data.profile.approach || "Выберите то, что хотите узнать сейчас: больше о специалисте или подробнее об услугах и стоимости."}</p>
       <div className="link-pictures">
         <Link to="/services">
-          <img src="/media/session-01.jpg" alt="" loading="lazy" />
+          <img src="/media/session-neutral-01.jpg" alt="" loading="lazy" />
           <span>Услуги и цены</span>
         </Link>
         <Link to="/about">

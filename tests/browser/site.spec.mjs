@@ -21,6 +21,8 @@ test('public routes, local media, menu and responsive layout', async ({ page }, 
       await page.goBack();
       await expect(page).toHaveURL(/\/$/);
       for (const image of await page.locator('img').all()) {
+        // Responsive layouts intentionally hide the desktop-only media.
+        if (!(await image.isVisible())) continue;
         await image.scrollIntoViewIfNeeded();
         await expect.poll(() => image.evaluate(el => el.complete && el.naturalWidth > 0)).toBe(true);
       }

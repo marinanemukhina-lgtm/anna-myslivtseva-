@@ -7,3 +7,8 @@ dist/
 .vercel/
 *.log
 .qa/
+
+/public/media/anna-portrait-smile.png
+/public/media/anna-portrait-calm.mp4
+/public/media/anna-session-neutral-01.mp4
+/public/media/anna-session-neutral-02.mp4

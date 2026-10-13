@@ -12,7 +12,9 @@
     "start": "node server/start.mjs",
     "setup": "node scripts/setup.mjs",
     "test": "node --test tests/api.test.mjs",
-    "test:sites": "node --test tests/sites-worker.test.mjs"
+    "test:sites": "node --test tests/sites-worker.test.mjs",
+    "prebuild": "node scripts/restore-media.mjs",
+    "predev": "node scripts/restore-media.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "5.2.8",

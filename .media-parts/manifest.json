@@ -1,0 +1,83 @@
+[
+  {
+    "path": "public/media/anna-portrait-smile.png",
+    "size": 1921691,
+    "sha256": "a3f54eb36538b3b08aea7a49a25ea52d959554a28aa22e6e0b413005f000276e",
+    "parts": [
+      ".media-parts/anna-portrait-smile.png.000.b64",
+      ".media-parts/anna-portrait-smile.png.001.b64",
+      ".media-parts/anna-portrait-smile.png.002.b64",
+      ".media-parts/anna-portrait-smile.png.003.b64",
+      ".media-parts/anna-portrait-smile.png.004.b64",
+      ".media-parts/anna-portrait-smile.png.005.b64",
+      ".media-parts/anna-portrait-smile.png.006.b64",
+      ".media-parts/anna-portrait-smile.png.007.b64",
+      ".media-parts/anna-portrait-smile.png.008.b64",
+      ".media-parts/anna-portrait-smile.png.009.b64"
+    ]
+  },
+  {
+    "path": "public/media/anna-portrait-calm.mp4",
+    "size": 1823662,
+    "sha256": "bfc41377ef5363377122f8a3cf425f1c14ce3e71b3175c5e5f18771d2485309d",
+    "parts": [
+      ".media-parts/anna-portrait-calm.mp4.000.b64",
+      ".media-parts/anna-portrait-calm.mp4.001.b64",
+      ".media-parts/anna-portrait-calm.mp4.002.b64",
+      ".media-parts/anna-portrait-calm.mp4.003.b64",
+      ".media-parts/anna-portrait-calm.mp4.004.b64",
+      ".media-parts/anna-portrait-calm.mp4.005.b64",
+      ".media-parts/anna-portrait-calm.mp4.006.b64",
+      ".media-parts/anna-portrait-calm.mp4.007.b64",
+      ".media-parts/anna-portrait-calm.mp4.008.b64",
+      ".media-parts/anna-portrait-calm.mp4.009.b64"
+    ]
+  },
+  {
+    "path": "public/media/anna-session-neutral-01.mp4",
+    "size": 1801216,
+    "sha256": "b7ab2a8ae014dde5b6b3f967e3c7ef716148b4d8d8acf90901e09694b7b217a3",
+    "parts": [
+      ".media-parts/anna-session-neutral-01.mp4.000.b64",
+      ".media-parts/anna-session-neutral-01.mp4.001.b64",
+      ".media-parts/anna-session-neutral-01.mp4.002.b64",
+      ".media-parts/anna-session-neutral-01.mp4.003.b64",
+      ".media-parts/anna-session-neutral-01.mp4.004.b64",
+      ".media-parts/anna-session-neutral-01.mp4.005.b64",
+      ".media-parts/anna-session-neutral-01.mp4.006.b64",
+      ".media-parts/anna-session-neutral-01.mp4.007.b64",
+      ".media-parts/anna-session-neutral-01.mp4.008.b64",
+      ".media-parts/anna-session-neutral-01.mp4.009.b64"
+    ]
+  },
+  {
+    "path": "public/media/anna-session-neutral-02.mp4",
+    "size": 4430253,
+    "sha256": "7ce82309132f90be75f3745633ace31e9ba0fe33d147cd9bdf9e6367cd6c96e3",
+    "parts": [
+      ".media-parts/anna-session-neutral-02.mp4.000.b64",
+      ".media-parts/anna-session-neutral-02.mp4.001.b64",
+      ".media-parts/anna-session-neutral-02.mp4.002.b64",
+      ".media-parts/anna-session-neutral-02.mp4.003.b64",
+      ".media-parts/anna-session-neutral-02.mp4.004.b64",
+      ".media-parts/anna-session-neutral-02.mp4.005.b64",
+      ".media-parts/anna-session-neutral-02.mp4.006.b64",
+      ".media-parts/anna-session-neutral-02.mp4.007.b64",
+      ".media-parts/anna-session-neutral-02.mp4.008.b64",
+      ".media-parts/anna-session-neutral-02.mp4.009.b64",
+      ".media-parts/anna-session-neutral-02.mp4.010.b64",
+      ".media-parts/anna-session-neutral-02.mp4.011.b64",
+      ".media-parts/anna-session-neutral-02.mp4.012.b64",
+      ".media-parts/anna-session-neutral-02.mp4.013.b64",
+      ".media-parts/anna-session-neutral-02.mp4.014.b64",
+      ".media-parts/anna-session-neutral-02.mp4.015.b64",
+      ".media-parts/anna-session-neutral-02.mp4.016.b64",
+      ".media-parts/anna-session-neutral-02.mp4.017.b64",
+      ".media-parts/anna-session-neutral-02.mp4.018.b64",
+      ".media-parts/anna-session-neutral-02.mp4.019.b64",
+      ".media-parts/anna-session-neutral-02.mp4.020.b64",
+      ".media-parts/anna-session-neutral-02.mp4.021.b64",
+      ".media-parts/anna-session-neutral-02.mp4.022.b64"
+    ]
+  }
+]

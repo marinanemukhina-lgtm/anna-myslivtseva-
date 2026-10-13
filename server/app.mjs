@@ -73,7 +73,8 @@ export function createApp() {
     });
     next();
   });
-  app.use(express.json({ limit: "4mb" }));
+  // 3 MiB of file bytes expands to 4 MiB in base64, plus the JSON envelope.
+  app.use(express.json({ limit: 4 * 1024 * 1024 + 16 * 1024 }));
   app.use("/api", (req, res, next) => {
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
     const origin = req.headers.origin;

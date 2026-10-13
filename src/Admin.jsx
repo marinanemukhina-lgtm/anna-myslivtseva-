@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { mergeSavedPayload } from "../shared/admin-save.mjs";
 import { useSite } from "./App.jsx";
 import "./admin.css";
 const tabs = [
@@ -134,6 +135,7 @@ function Upload({ value, onChange, pdf = false }) {
 }
 export default function Admin() {
   const { navigate, load } = useSite();
+  const editRevision = useRef(0);
   const [auth, setAuth] = useState(null),
     [configured, setConfigured] = useState(true),
     [password, setPassword] = useState(""),
@@ -171,6 +173,7 @@ export default function Admin() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
   const change = (mutate) => {
+    editRevision.current += 1;
     setPayload((p) => {
       const next = structuredClone(p);
       mutate(next.data);
@@ -194,6 +197,9 @@ export default function Admin() {
     });
   const save = async (e) => {
     e?.preventDefault();
+    if (busy) return;
+    const submitted = payload;
+    const submittedRevision = editRevision.current;
     setBusy(true);
     setError("");
     setNotice("");
@@ -202,9 +208,12 @@ export default function Admin() {
         if (payload.data[k].some((x) => x.published && !x.title.trim()))
           throw Error("У опубликованной записи должно быть название.");
       const result = await api("/api/admin/content", "PUT", payload);
-      setPayload(result);
-      setDirty(false);
-      setNotice("Сохранено. Опубликованные записи уже видны на сайте.");
+      const hasNewEdits = editRevision.current !== submittedRevision;
+      setPayload((current) => mergeSavedPayload(current, submitted, result));
+      setDirty(hasNewEdits);
+      setNotice(hasNewEdits
+        ? "Предыдущие изменения сохранены. Новые правки ещё не сохранены."
+        : "Сохранено. Опубликованные записи уже видны на сайте.");
       load();
     } catch (err) {
       setError(err.message);

@@ -110,6 +110,18 @@ test("authenticated CMS persists edits without exposing drafts", async (t) => {
   assert.equal(media.status, 201);
   const { url } = await media.json();
   assert.equal((await req(url)).status, 200);
+  const boundaryFile = Buffer.alloc(3 * 1024 * 1024);
+  boundaryFile.write("%PDF-1.7");
+  assert.equal((await req("/api/media", "POST", {
+    name: "maximum-diploma.pdf",
+    type: "application/pdf",
+    base64: boundaryFile.toString("base64"),
+  })).status, 201, "a file at the advertised 3 MiB limit must upload");
+  assert.equal((await req("/api/media", "POST", {
+    name: "too-large.pdf",
+    type: "application/pdf",
+    base64: Buffer.concat([boundaryFile, Buffer.from([0])]).toString("base64"),
+  })).status, 400, "files over 3 MiB must still be rejected");
   assert.equal((await req("/api/session", "DELETE")).status, 200);
   assert.equal((await req("/api/admin/content")).status, 401);
   cookie = "";

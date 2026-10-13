@@ -15,7 +15,8 @@
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "prebuild": "node scripts/restore-media.mjs",
     "predev": "node scripts/restore-media.mjs",
-    "test:browser": "playwright test"
+    "test:browser": "playwright test",
+    "pretest": "node scripts/restore-media.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "5.2.8",

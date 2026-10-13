@@ -134,6 +134,7 @@ export default function AdminSetup() {
             </label>
             <button className="admin-setup-secondary" type="button" onClick={() => { output.current?.focus(); output.current?.select(); }}>Выделить значение</button>
             <p className="admin-setup-small">Скопируйте выделенное значение вручную. Относитесь к нему как к секрету: не отправляйте в чат и не добавляйте в код или репозиторий.</p>
+            <p>Для входа в панель на Vercel также нужно настроенное подключение к базе данных DATABASE_URL. Создание хеша пароля само по себе не подключает базу.</p>
             <ol>
               <li>В Vercel откройте свой проект → Settings → Environment Variables.</li>
               <li>Добавьте ADMIN_PASSWORD_HASH. Вставьте только значение из поля выше, без имени переменной и кавычек. Выберите нужное окружение, например Production.</li>

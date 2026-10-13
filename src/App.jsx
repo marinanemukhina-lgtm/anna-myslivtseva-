@@ -11,6 +11,7 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
+import Booking from "./Booking.jsx";
 import "./styles.css";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
@@ -970,6 +971,7 @@ function Contact() {
   return (
     <>
       <PageHero first="Запись" last="на приём." />
+      <Booking />
       <section className="contact-section grid">
         <h2>
           Связаться

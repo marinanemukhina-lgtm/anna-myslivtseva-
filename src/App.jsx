@@ -108,9 +108,9 @@ const nav = [
   ["/diplomas", "Дипломы"],
   ["/contact", "Запись на приём"],
 ];
-function Contacts({ compact = false }) {
+function Contacts({ compact = false, profile }) {
   const { data } = useSite();
-  const p = data.profile;
+  const p = profile || data.profile;
   if (!p.address && !p.phone && !p.email && !p.socialUrl) return null;
   return (
     <div className={"contacts " + (compact ? "compact" : "")}>
@@ -967,18 +967,18 @@ function formatDate(s) {
 }
 function Contact() {
   const { data } = useSite();
-  const p = data.profile;
+  const p = Object.fromEntries(Object.entries(data.profile).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
   return (
     <>
       <PageHero first="Запись" last="на приём." />
-      <Booking />
+      <Booking profile={p} />
       <section className="contact-section grid">
         <h2>
           Связаться
           <br />с Анной.
         </h2>
         <div>
-          <Contacts />
+          <Contacts profile={p} />
           {p.hours && (
             <>
               <h3>Часы приёма</h3>
@@ -994,7 +994,7 @@ function Contact() {
             >
               Записаться на приём
             </a>
-          ) : !p.phone && !p.email ? (
+          ) : !p.phone && !p.email && !p.socialUrl ? (
             <Empty>Контакты для записи скоро появятся.</Empty>
           ) : null}
         </div>

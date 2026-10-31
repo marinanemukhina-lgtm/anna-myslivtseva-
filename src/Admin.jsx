@@ -1,8 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { mergeSavedPayload } from "../shared/admin-save.mjs";
 import { useSite } from "./App.jsx";
 import "./admin.css";
+import AdminCalendar from "./AdminCalendar.jsx";
+import { mergeScheduleSave } from "./booking-client.mjs";
 const tabs = [
   ["profile", "О себе и сайт"],
+  ["calendar", "Календарь и запись"],
   ["services", "Услуги и цены"],
   ["news", "Новости"],
   ["offers", "Акции"],
@@ -134,6 +138,9 @@ function Upload({ value, onChange, pdf = false }) {
 }
 export default function Admin() {
   const { navigate, load } = useSite();
+  const editRevision = useRef(0);
+  const [calendarDirty, setCalendarDirty] = useState(false);
+  const [calendarBusy, setCalendarBusy] = useState(false);
   const [auth, setAuth] = useState(null),
     [configured, setConfigured] = useState(true),
     [password, setPassword] = useState(""),
@@ -162,15 +169,16 @@ export default function Admin() {
       });
   }, []);
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !calendarDirty) return;
     const warn = (e) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
+  }, [dirty, calendarDirty]);
   const change = (mutate) => {
+    editRevision.current += 1;
     setPayload((p) => {
       const next = structuredClone(p);
       mutate(next.data);
@@ -184,7 +192,7 @@ export default function Admin() {
       d.profile[key] = value;
     });
   const item =
-    payload && tab !== "profile"
+    payload && tab !== "profile" && tab !== "calendar"
       ? payload.data[tab].find((x) => x.id === selected)
       : null;
   const changeItem = (key, value) =>
@@ -194,6 +202,9 @@ export default function Admin() {
     });
   const save = async (e) => {
     e?.preventDefault();
+    if (busy) return;
+    const submitted = payload;
+    const submittedRevision = editRevision.current;
     setBusy(true);
     setError("");
     setNotice("");
@@ -202,9 +213,12 @@ export default function Admin() {
         if (payload.data[k].some((x) => x.published && !x.title.trim()))
           throw Error("У опубликованной записи должно быть название.");
       const result = await api("/api/admin/content", "PUT", payload);
-      setPayload(result);
-      setDirty(false);
-      setNotice("Сохранено. Опубликованные записи уже видны на сайте.");
+      const hasNewEdits = editRevision.current !== submittedRevision;
+      setPayload((current) => mergeSavedPayload(current, submitted, result));
+      setDirty(hasNewEdits);
+      setNotice(hasNewEdits
+        ? "Предыдущие изменения сохранены. Новые правки ещё не сохранены."
+        : "Сохранено. Опубликованные записи уже видны на сайте.");
       load();
     } catch (err) {
       setError(err.message);
@@ -282,8 +296,7 @@ export default function Admin() {
             </>
           ) : (
             <p>
-              Доступ ещё не настроен. Задайте пароль администратора при
-              установке проекта.
+              Доступ ещё не настроен. <a href="/admin/setup">Подготовьте пароль</a> и сохраните его хеш в настройках проекта Vercel.
             </p>
           )}
           {error && (
@@ -308,15 +321,17 @@ export default function Admin() {
           {tabs.map(([key, label]) => (
             <button
               key={key}
+              disabled={calendarBusy}
               className={tab === key ? "active" : ""}
               onClick={() => {
+                if (calendarDirty && key !== tab && !confirm("Есть несохранённое расписание. Перейти без сохранения?")) return;
                 setTab(key);
                 setSelected(null);
                 setError("");
               }}
             >
               {label}
-              {payload && key !== "profile" && (
+              {payload && key !== "profile" && key !== "calendar" && (
                 <span>{payload.data[key].length}</span>
               )}
             </button>
@@ -327,9 +342,10 @@ export default function Admin() {
             Открыть сайт
           </a>
           <button
+            disabled={calendarBusy}
             onClick={async () => {
               if (
-                dirty &&
+                (dirty || calendarDirty) &&
                 !confirm("Есть несохранённые изменения. Выйти без сохранения?")
               )
                 return;
@@ -347,19 +363,19 @@ export default function Admin() {
         <header className="admin-topbar">
           <div>
             <span className="eyebrow">
-              {dirty
+              {tab === "calendar" ? "Подготовка расписания" : dirty
                 ? "Есть несохранённые изменения"
                 : "Все изменения сохранены"}
             </span>
             <h1>{tabs.find((t) => t[0] === tab)?.[1]}</h1>
           </div>
-          <button
+          {tab !== "calendar" && <button
             className="admin-primary"
             onClick={save}
             disabled={busy || !dirty || !payload}
           >
             {busy ? "Сохраняем…" : "Сохранить изменения"}
-          </button>
+          </button>}
         </header>
         {error && (
           <div role="alert" className="admin-alert admin-error">
@@ -373,6 +389,8 @@ export default function Admin() {
         )}
         {!payload ? (
           <p>Загрузка…</p>
+        ) : tab === "calendar" ? (
+          <AdminCalendar services={payload.data.services} onDirtyChange={setCalendarDirty} onBusyChange={setCalendarBusy} onUnauthenticated={() => setAuth(false)} onSaved={(previousVersion, saved) => setPayload(current => mergeScheduleSave(current, previousVersion, saved))} />
         ) : tab === "profile" ? (
           <form className="profile-form" onSubmit={save}>
             <section className="admin-card">

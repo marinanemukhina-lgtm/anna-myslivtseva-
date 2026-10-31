@@ -1,4 +1,7 @@
 import express from "express";
+import { registerAssistant } from "./assistant.mjs";
+import { closePublicIntake, registerBookingPreparation } from "./booking.mjs";
+import { defaults as bookingDefaults } from "../shared/booking.mjs";
 import {
   randomBytes,
   randomUUID,
@@ -73,7 +76,9 @@ export function createApp() {
     });
     next();
   });
-  app.use(express.json({ limit: "4mb" }));
+  closePublicIntake(app);
+  // 3 MiB of file bytes expands to 4 MiB in base64, plus the JSON envelope.
+  app.use(express.json({ limit: 4 * 1024 * 1024 + 16 * 1024 }));
   app.use("/api", (req, res, next) => {
     if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
     const origin = req.headers.origin;
@@ -96,6 +101,7 @@ export function createApp() {
       return res.status(415).json({ error: "Ожидается JSON." });
     next();
   });
+  registerAssistant(app);
   app.get("/api/content", async (req, res, next) => {
     try {
       if (process.env.VERCEL && !process.env.DATABASE_URL)
@@ -198,6 +204,16 @@ export function createApp() {
           return res
             .status(400)
             .json({ error: "У опубликованной записи должен быть заголовок." });
+      // Only the dedicated schedule endpoint may change bookingSchedule.
+      // Preserve it even if an older CMS form omits or submits stale settings.
+      const currentSchedule = (await readContent()).data.bookingSchedule ?? bookingDefaults();
+      const retainedServiceIds = new Set(parsed.data.services.map((service) => service.id));
+      parsed.data.bookingSchedule = {
+        ...currentSchedule,
+        // Deleting a CMS service also removes its private duration configuration,
+        // so later schedule saves cannot be blocked by an invisible orphan.
+        services: currentSchedule.services.filter((service) => retainedServiceIds.has(service.serviceId)),
+      };
       const { query } = await database();
       const rows = await query(
         "UPDATE content SET body=$1,version=version+1 WHERE id=$2 AND version=$3 RETURNING version",
@@ -283,6 +299,7 @@ export function createApp() {
       next(e);
     }
   });
+  registerBookingPreparation(app, requireAdmin);
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "Страница не найдена." }),
   );

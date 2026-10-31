@@ -11,6 +11,8 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
+import Booking from "./Booking.jsx";
+import VisitorAssistant from "./VisitorAssistant.jsx";
 import "./styles.css";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
@@ -107,9 +109,9 @@ const nav = [
   ["/diplomas", "Дипломы"],
   ["/contact", "Запись на приём"],
 ];
-function Contacts({ compact = false }) {
+function Contacts({ compact = false, profile }) {
   const { data } = useSite();
-  const p = data.profile;
+  const p = profile || data.profile;
   if (!p.address && !p.phone && !p.email && !p.socialUrl) return null;
   return (
     <div className={"contacts " + (compact ? "compact" : "")}>
@@ -412,7 +414,7 @@ function FourSteps() {
       title: "Услуги и цены",
       body: "Направления работы, описание приёмов, их продолжительность и стоимость.",
       to: "/services",
-      image: "/media/session-01.jpg",
+      image: "/media/session-neutral-01.jpg",
     },
     {
       title: "Дипломы",
@@ -424,7 +426,7 @@ function FourSteps() {
       title: "Запись на приём",
       body: "Контакты, адрес и время приёма — всё необходимое, чтобы связаться с Анной.",
       to: "/contact",
-      image: "/media/session-02.jpg",
+      image: "/media/session-neutral-02.jpg",
     },
   ];
   useEffect(() => {
@@ -580,7 +582,7 @@ function PageLinks() {
       <p>{data.profile.approach || "Выберите то, что хотите узнать сейчас: больше о специалисте или подробнее об услугах и стоимости."}</p>
       <div className="link-pictures">
         <Link to="/services">
-          <img src="/media/session-01.jpg" alt="" loading="lazy" />
+          <img src="/media/session-neutral-01.jpg" alt="" loading="lazy" />
           <span>Услуги и цены</span>
         </Link>
         <Link to="/about">
@@ -966,17 +968,18 @@ function formatDate(s) {
 }
 function Contact() {
   const { data } = useSite();
-  const p = data.profile;
+  const p = Object.fromEntries(Object.entries(data.profile).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
   return (
     <>
       <PageHero first="Запись" last="на приём." />
+      <Booking profile={p} />
       <section className="contact-section grid">
         <h2>
           Связаться
           <br />с Анной.
         </h2>
         <div>
-          <Contacts />
+          <Contacts profile={p} />
           {p.hours && (
             <>
               <h3>Часы приёма</h3>
@@ -992,7 +995,7 @@ function Contact() {
             >
               Записаться на приём
             </a>
-          ) : !p.phone && !p.email ? (
+          ) : !p.phone && !p.email && !p.socialUrl ? (
             <Empty>Контакты для записи скоро появятся.</Empty>
           ) : null}
         </div>
@@ -1223,6 +1226,7 @@ export default function App() {
               <Page />
             </main>
             <Footer />
+            <VisitorAssistant />
           </>
         )}
       </div>

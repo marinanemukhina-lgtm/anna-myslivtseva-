@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { defaults as bookingDefaults, settingsSchema } from "./booking.mjs";
 const text = z.string().max(50000),
   short = z.string().max(500),
   id = z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/);
@@ -25,6 +26,7 @@ const base = {
   published: z.boolean(),
 };
 export const contentSchema = z.object({
+  bookingSchedule: settingsSchema.default(bookingDefaults),
   profile: z.object({
     name: short,
     role: short,
@@ -106,8 +108,9 @@ export const initialContent = {
   diplomas: [],
 };
 export function publicContent(data) {
+  const { bookingSchedule: _privateSchedule, ...visible } = data;
   return {
-    ...data,
+    ...visible,
     services: data.services.filter((x) => x.published),
     news: data.news.filter((x) => x.published),
     offers: data.offers.filter((x) => x.published),

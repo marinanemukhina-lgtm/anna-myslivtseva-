@@ -35,20 +35,32 @@ export default function VisitorAssistant() {
       return [p.address && "Адрес: " + p.address, p.hours && "Часы: " + p.hours, p.phone && "Телефон: " + p.phone, p.email && "Почта: " + p.email].filter(Boolean).join("\n") || "Контакты пока не опубликованы. Посмотрите раздел «Запись на приём».";
     return "Я могу подсказать опубликованные услуги и цены, контакты и путь к записи. Для индивидуальных вопросов обратитесь непосредственно к Анне.";
   }
-  function submit(e) {
+  const [busy, setBusy] = useState(false);
+  async function submit(e) {
     e.preventDefault();
     const q = input.trim().slice(0, 500);
     if (!q) return;
-    setMessages(m => [...m.slice(-18), { from: "user", text: q }, { from: "assistant", text: answer(q) }]);
+    if (busy) return;
+    const history = [...messages.slice(-10).map(m => ({ role: m.from === "user" ? "user" : "assistant", content: m.text })), { role: "user", content: q }];
+    setMessages(m => [...m.slice(-18), { from: "user", text: q }]);
     setInput("");
+    setBusy(true);
+    try {
+      const response = await fetch("/api/assistant/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: history }) });
+      const json = await response.json();
+      if (!response.ok) throw Error(json.error || "Ошибка подключения");
+      setMessages(m => [...m, { from: "assistant", text: json.reply }]);
+    } catch (error) {
+      setMessages(m => [...m, { from: "assistant", text: error.message || "Попробуйте позднее." }]);
+    } finally { setBusy(false); }
   }
   return <div className="visitor-assistant">
     <button className="visitor-assistant-toggle" type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-controls="visitor-assistant-panel">{open ? "Закрыть" : "Задать вопрос"}</button>
     {open && <section className="visitor-assistant-panel" id="visitor-assistant-panel" aria-label="Виртуальный помощник">
       <header><strong>Помощник Анны</strong><button type="button" onClick={() => setOpen(false)} aria-label="Закрыть помощника">×</button></header>
       <div className="visitor-assistant-log" ref={log} role="log" aria-live="polite">{messages.map((m, i) => <p key={i} className={m.from === "user" ? "visitor-user" : "visitor-reply"}>{m.text}</p>)}</div>
-      <form onSubmit={submit}><label htmlFor="visitor-question">Ваш вопрос</label><div><input id="visitor-question" value={input} maxLength={500} onChange={e => setInput(e.target.value)} placeholder="Услуги, цены, запись…" /><button type="submit">Отправить</button></div></form>
-      <small>Ответы по данным сайта. Не сообщайте сведения о здоровье и персональные данные. Сообщения не отправляются на сервер.</small>
+      <form onSubmit={submit}><label htmlFor="visitor-question">Ваш вопрос</label><div><input id="visitor-question" value={input} maxLength={500} onChange={e => setInput(e.target.value)} placeholder="Услуги, цены, запись…" /><button type="submit" disabled={busy}>{busy ? "Думаю…" : "Отправить"}</button></div></form>
+      <small>Ответы по данным сайта. Не сообщайте сведения о здоровье и персональные данные. Сообщения передаются ИИ-провайдеру для формирования ответа. Не сообщайте сведения о здоровье или персональные данные.</small>
     </section>}
     <style>{`
       .visitor-assistant{position:fixed;right:20px;bottom:20px;z-index:10000;font-family:Inter,Arial,sans-serif;color:#26231f}

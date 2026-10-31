@@ -9,10 +9,12 @@ import "@fontsource/inter/latin-500.css";
 import App from "./App.jsx";
 const setup = window.location.pathname.replace(/\/$/, "") === "/admin/setup";
 const AdminSetup = lazy(() => import("./AdminSetup.jsx"));
+const ClinicalDemo = lazy(() => import("./ClinicalDemo.jsx"));
+const clinicalDemo = window.location.pathname.replace(/\/$/, "") === "/clinical-demo";
 if (setup) {
   document.documentElement.lang = "ru";
   document.title = "Подготовка пароля · Анна Мысливцева";
 }
 createRoot(document.getElementById("root")).render(
-  setup ? <Suspense fallback={<p role="status">Загрузка настройки…</p>}><AdminSetup /></Suspense> : <App />,
+  setup ? <Suspense fallback={<p role="status">Загрузка настройки…</p>}><AdminSetup /></Suspense> : clinicalDemo ? <Suspense fallback={<p role="status">Загрузка демоверсии…</p>}><ClinicalDemo /></Suspense> : <App />,
 );

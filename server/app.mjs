@@ -1,4 +1,5 @@
 import express from "express";
+import { registerAssistant } from "./assistant.mjs";
 import { closePublicIntake, registerBookingPreparation } from "./booking.mjs";
 import { defaults as bookingDefaults } from "../shared/booking.mjs";
 import {
@@ -100,6 +101,7 @@ export function createApp() {
       return res.status(415).json({ error: "Ожидается JSON." });
     next();
   });
+  registerAssistant(app);
   app.get("/api/content", async (req, res, next) => {
     try {
       if (process.env.VERCEL && !process.env.DATABASE_URL)

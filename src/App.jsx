@@ -12,6 +12,7 @@ import Lenis from "lenis";
 import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
 import Booking from "./Booking.jsx";
+import VisitorAssistant from "./VisitorAssistant.jsx";
 import "./styles.css";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
@@ -1225,6 +1226,7 @@ export default function App() {
               <Page />
             </main>
             <Footer />
+            <VisitorAssistant />
           </>
         )}
       </div>

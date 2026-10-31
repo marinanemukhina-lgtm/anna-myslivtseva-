@@ -26,7 +26,7 @@ export default function ClinicalDemo() {
   const rub = n => new Intl.NumberFormat("ru-RU", {style:"currency",currency:"RUB",maximumFractionDigits:0}).format(n);
   return <main style={{minHeight:"100vh",background:"#f7f5f0",color:"#292620",fontFamily:"Inter,Arial,sans-serif",padding:"clamp(20px,5vw,64px)"}}>
     <div style={{maxWidth:1120,margin:"auto"}}>
-      <a href="/" style={{color:"#675744"}}>← Вернуться на сайт</a>
+      <a href="/" style={{color:"#675744"}}>← Вернуться на сайт</a> · <a href="/planner-demo" style={{color:"#675744"}}>Календарь и аналитика →</a>
       <p style={{fontSize:12,letterSpacing:2,textTransform:"uppercase",marginTop:36}}>Анна Мысливцева · концепт кабинета остеопата</p>
       <h1 style={{fontFamily:"Georgia,serif",fontSize:"clamp(32px,5vw,56px)",fontWeight:400,margin:"12px 0"}}>История наблюдений</h1>
       <p style={{maxWidth:760,lineHeight:1.7}}>Демонстрационная версия на вымышленных данных. Никакие медицинские сведения не загружаются, не сохраняются и не передаются серверу. Функция не предназначена для реальных пациентов.</p>

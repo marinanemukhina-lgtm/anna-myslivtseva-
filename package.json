@@ -11,7 +11,7 @@
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "start": "node server/start.mjs",
     "setup": "node scripts/setup.mjs",
-    "test": "node --test tests/api.test.mjs tests/assets.test.mjs tests/admin-save.test.mjs tests/admin-password-hash.test.mjs tests/booking-client.test.mjs tests/booking-preparation.test.mjs tests/booking-availability.test.mjs tests/contact-state.test.mjs",
+    "test": "node --test tests/api.test.mjs tests/assets.test.mjs tests/admin-save.test.mjs tests/admin-password-hash.test.mjs tests/booking-client.test.mjs tests/booking-preparation.test.mjs tests/booking-availability.test.mjs tests/contact-state.test.mjs tests/seo.test.mjs tests/evidence-editorial.test.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "prebuild": "node scripts/restore-media.mjs",
     "predev": "node scripts/restore-media.mjs",

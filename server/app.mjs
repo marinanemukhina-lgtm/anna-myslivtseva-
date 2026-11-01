@@ -1,4 +1,6 @@
 import express from "express";
+import { registerSeo } from "./seo.mjs";
+import { registerEvidenceEditorial, evidenceIds } from "./evidence-editorial.mjs";
 import { closePublicIntake, registerBookingPreparation } from "./booking.mjs";
 import { defaults as bookingDefaults } from "../shared/booking.mjs";
 import {
@@ -197,6 +199,13 @@ export function createApp() {
           parsed.data[collection].length
         )
           return res.status(400).json({ error: "Повторяющиеся записи." });
+      // Research summaries cannot be published from the generic CMS switch.
+      // Medical review / authorization requires a separate, explicit workflow.
+      if (parsed.data.news.some((item) => evidenceIds.has(item.id) && item.published))
+        return res.status(422).json({
+          code: "MEDICAL_REVIEW_REQUIRED",
+          error: "Научный материал остаётся черновиком до подтверждённой медицинской редакторской проверки.",
+        });
       for (const collection of ["services", "news", "offers", "diplomas"])
         if (parsed.data[collection].some((x) => x.published && !x.title.trim()))
           return res
@@ -298,6 +307,8 @@ export function createApp() {
     }
   });
   registerBookingPreparation(app, requireAdmin);
+  registerSeo(app);
+  registerEvidenceEditorial(app, requireAdmin);
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "Страница не найдена." }),
   );

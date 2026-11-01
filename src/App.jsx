@@ -12,6 +12,8 @@ import Lenis from "lenis";
 import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
 import Booking from "./Booking.jsx";
+import { applySeo } from "./seo-client.mjs";
+import ArticleText from "./ArticleText.jsx";
 import "./styles.css";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
@@ -904,7 +906,7 @@ function Listing({ type, id }) {
           <img className="article-cover" src={item.image} alt={item.title} />
         )}
         <div className="article-body">
-          <p className="pre-line">{item.body}</p>
+          <ArticleText body={item.body} />
           {item.price && <h2>{item.price}</h2>}
           {item.until && <p>Действует до {formatDate(item.until)}</p>}
           {item.conditions && <p className="pre-line">{item.conditions}</p>}
@@ -1064,6 +1066,7 @@ export default function App() {
       !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     );
   const [ready, setReady] = useState(false);
+  useEffect(() => { applySeo(path, data); }, [path, data]);
   const root = useRef(null),
     lenis = useRef(null);
   const load = () =>

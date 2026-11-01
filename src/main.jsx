@@ -7,6 +7,8 @@ import "@fontsource/inter/latin-400.css";
 import "@fontsource/inter/cyrillic-500.css";
 import "@fontsource/inter/latin-500.css";
 import App from "./App.jsx";
+import "./quality.css";
+import "./reading-tools.mjs";
 const setup = window.location.pathname.replace(/\/$/, "") === "/admin/setup";
 const AdminSetup = lazy(() => import("./AdminSetup.jsx"));
 if (setup) {

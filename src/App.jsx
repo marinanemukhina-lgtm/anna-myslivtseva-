@@ -12,6 +12,7 @@ import Lenis from "lenis";
 import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
 import Booking from "./Booking.jsx";
+import { ClinicalPublic } from "./ClinicalDemo.jsx";
 import "./styles.css";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
@@ -1052,6 +1053,7 @@ function Page() {
   if (["news", "offers"].includes(parts[0]))
     return <Listing type={parts[0]} id={parts[1]} />;
   if (parts[0] === "contact") return <Contact />;
+  if (parts[0] === "demo" && parts[1] === "booking") return <ClinicalPublic />;
   if (["privacy", "terms"].includes(parts[0])) return <Legal type={parts[0]} />;
   return <NotFound />;
 }

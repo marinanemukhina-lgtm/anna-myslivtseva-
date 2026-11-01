@@ -1,5 +1,6 @@
 import express from "express";
 import { closePublicIntake, registerBookingPreparation } from "./booking.mjs";
+import { registerClinicalDemo } from "./clinical-demo.mjs";
 import { defaults as bookingDefaults } from "../shared/booking.mjs";
 import {
   randomBytes,
@@ -298,6 +299,7 @@ export function createApp() {
     }
   });
   registerBookingPreparation(app, requireAdmin);
+  registerClinicalDemo(app, requireAdmin);
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "Страница не найдена." }),
   );

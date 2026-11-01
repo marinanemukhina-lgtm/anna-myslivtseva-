@@ -3,10 +3,12 @@ import { mergeSavedPayload } from "../shared/admin-save.mjs";
 import { useSite } from "./App.jsx";
 import "./admin.css";
 import AdminCalendar from "./AdminCalendar.jsx";
+import { ClinicalAdmin } from "./ClinicalDemo.jsx";
 import { mergeScheduleSave } from "./booking-client.mjs";
 const tabs = [
   ["profile", "О себе и сайт"],
   ["calendar", "Календарь и запись"],
+  ["clinical", "Тестовые карты клиентов"],
   ["services", "Услуги и цены"],
   ["news", "Новости"],
   ["offers", "Акции"],
@@ -331,7 +333,7 @@ export default function Admin() {
               }}
             >
               {label}
-              {payload && key !== "profile" && key !== "calendar" && (
+              {payload && key !== "profile" && key !== "calendar" && key !== "clinical" && (
                 <span>{payload.data[key].length}</span>
               )}
             </button>
@@ -369,7 +371,7 @@ export default function Admin() {
             </span>
             <h1>{tabs.find((t) => t[0] === tab)?.[1]}</h1>
           </div>
-          {tab !== "calendar" && <button
+          {tab !== "calendar" && tab !== "clinical" && <button
             className="admin-primary"
             onClick={save}
             disabled={busy || !dirty || !payload}
@@ -391,6 +393,8 @@ export default function Admin() {
           <p>Загрузка…</p>
         ) : tab === "calendar" ? (
           <AdminCalendar services={payload.data.services} onDirtyChange={setCalendarDirty} onBusyChange={setCalendarBusy} onUnauthenticated={() => setAuth(false)} onSaved={(previousVersion, saved) => setPayload(current => mergeScheduleSave(current, previousVersion, saved))} />
+        ) : tab === "clinical" ? (
+          <ClinicalAdmin />
         ) : tab === "profile" ? (
           <form className="profile-form" onSubmit={save}>
             <section className="admin-card">

@@ -45,3 +45,18 @@ export function metadataFor(path, data) {
   const noindex = !allowed || pathname.startsWith("/admin") || pathname.startsWith("/demo");
   return { title, description, canonicalPath: pathname, robots: noindex ? "noindex, nofollow" : "index, follow" };
 }
+
+
+export function sitemapXml(siteUrl, data) {
+  const origin = new URL(siteUrl);
+  if (origin.protocol !== "https:" || origin.username || origin.password ||
+    origin.search || origin.hash || origin.pathname !== "/")
+    throw new Error("PUBLIC_SITE_URL must be an https origin, for example https://example.ru/");
+  const xmlEscape = x => x.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+  const locs = indexablePaths(data).map(path => "<url><loc>" +
+    xmlEscape(origin.origin + path) + "</loc></url>");
+  return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    locs.join("\n") + '\n</urlset>\n';
+}

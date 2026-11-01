@@ -30,7 +30,7 @@ test("research drafts are source-backed and import only through authenticated CM
   for (const article of evidenceDrafts) {
     assert.ok(article.sources.length > 0);
     assert.ok(article.body.includes(article.sourceUrl));
-    assert.ok(article.body.includes("провер"));
+    assert.match(article.body, /(До публикации|Требуется медицинская|До размещения)/i);
     assert.ok(article.body.length > 1200);
   }
 

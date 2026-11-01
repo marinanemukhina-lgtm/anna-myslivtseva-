@@ -6,7 +6,7 @@ test("scientific reading imports as hidden editable drafts, never automatically 
   await page.getByLabel("Пароль", { exact:true }).fill("browser-fixture-only-password");
   await page.getByRole("button", { name:"Войти", exact:true }).click();
   await expect(page.getByLabel("Специализация", { exact:true })).toBeVisible();
-  await page.getByRole("button", { name:"Новости", exact:true }).click();
+  await page.getByRole("button", { name:/^Новости/ }).click();
   const importButton = page.getByRole("button", { name:"Загрузить научные статьи в черновики" });
   await expect(importButton).toBeEnabled();
   await importButton.click();

@@ -12,6 +12,7 @@ import Lenis from "lenis";
 import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
 import Booking from "./Booking.jsx";
+import { applySeo } from "./seo-client.mjs";
 import "./styles.css";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
@@ -306,6 +307,7 @@ function HeroPortrait() {
   const { data, motion, setMotion } = useSite();
   const ref = useRef(null);
   const [ready, setReady] = useState(false);
+  useEffect(() => { applySeo(path, data); }, [path, data]);
   const [failed, setFailed] = useState(false);
   const original = !data.profile.portrait || ["/media/anna-portrait.jpg", "/media/anna-portrait-smile.png"].includes(data.profile.portrait);
   useEffect(() => {

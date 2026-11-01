@@ -227,6 +227,33 @@ export default function Admin() {
       setBusy(false);
     }
   };
+  const importEvidence = async () => {
+    if (busy || dirty || calendarDirty) {
+      setError("Сначала сохраните текущие изменения, затем импортируйте научные черновики.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const catalog = await api("/api/admin/evidence/catalog");
+      const ids = catalog.items.filter(item => !item.imported).map(item => item.id);
+      if (!ids.length) {
+        setNotice("Все доступные научные черновики уже присутствуют в редакции.");
+        return;
+      }
+      const result = await api("/api/admin/evidence/import", "POST", { ids });
+      setPayload({ data:result.data, version:result.version });
+      setSelected(result.imported[0] || null);
+      setNotice("Добавлены научные черновики: " + result.imported.length +
+        ". Они не опубликованы и ожидают медицинской проверки.");
+    } catch (err) {
+      setError(err.message);
+      if (err.status === 401) setAuth(false);
+    } finally {
+      setBusy(false);
+    }
+  };
   const add = () => {
     const id = crypto.randomUUID();
     const base = { id, title: "", body: "", image: "", published: false };
@@ -534,6 +561,12 @@ export default function Admin() {
                       ? "акцию"
                       : "диплом"}
               </button>
+              {tab === "news" && (
+                <button type="button" className="admin-add" onClick={importEvidence}
+                  disabled={busy || dirty || calendarDirty}>
+                  Загрузить научные статьи в черновики
+                </button>
+              )}
               {payload.data[tab].length ? (
                 payload.data[tab].map((x, i) => (
                   <button
@@ -696,9 +729,12 @@ export default function Admin() {
                   <input
                     type="checkbox"
                     checked={item.published}
+                    disabled={tab === "news" && item.id.startsWith("evidence-")}
                     onChange={(e) => changeItem("published", e.target.checked)}
                   />
-                  <span>Показывать на сайте после сохранения</span>
+                  <span>{tab === "news" && item.id.startsWith("evidence-")
+                    ? "Научный черновик. Публикация заблокирована до отдельной медицинской проверки."
+                    : "Показывать на сайте после сохранения"}</span>
                 </label>
                 <div className="editor-actions">
                   <button

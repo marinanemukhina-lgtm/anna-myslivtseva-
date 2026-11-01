@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
-import "./booking.css";
+import React from 'react';
+import './booking.css';
 
 export default function Booking({ profile = {} }) {
-  const [demo, setDemo] = useState(false);
-  useEffect(() => {
+  const [demo, setDemo] = React.useState(false);
+  React.useEffect(() => {
     let alive = true;
     fetch("/api/demo/clinical/config").then(r => r.json()).then(config => {
       if (alive) setDemo(config.enabled === true);

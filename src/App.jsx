@@ -307,7 +307,6 @@ function HeroPortrait() {
   const { data, motion, setMotion } = useSite();
   const ref = useRef(null);
   const [ready, setReady] = useState(false);
-  useEffect(() => { applySeo(path, data); }, [path, data]);
   const [failed, setFailed] = useState(false);
   const original = !data.profile.portrait || ["/media/anna-portrait.jpg", "/media/anna-portrait-smile.png"].includes(data.profile.portrait);
   useEffect(() => {
@@ -1066,6 +1065,7 @@ export default function App() {
       !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     );
   const [ready, setReady] = useState(false);
+  useEffect(() => { applySeo(path, data); }, [path, data]);
   const root = useRef(null),
     lenis = useRef(null);
   const load = () =>

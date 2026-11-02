@@ -83,3 +83,50 @@ html[data-anna-reader="active"] .article-page { padding-bottom: max(140px, var(-
   .article-page { margin: 0; padding: 0; }
   .article-body { max-width: none; font-size: 12pt; }
 }
+
+/* Navigation labels remain readable even when another card is active. */
+.step { opacity: 1; }
+
+/* Keep original portrait footage near its native width, with text beside it. */
+.hero-second,
+.full-media,
+.full-media.single {
+  height: auto;
+  min-height: 0;
+  padding: 72px var(--gutter);
+  color: var(--ink);
+  background: var(--paper);
+}
+.hero-second { display: grid; grid-template-columns: minmax(0,480px) minmax(0,1fr); gap: clamp(32px,6vw,100px); align-items: center; }
+.hero-second video { width: 100%; height: auto; aspect-ratio: 480/848; object-fit: contain; }
+.hero-second:after,.full-media:after { display: none; }
+.hero-second .film-caption { position: static; display: flex; flex-direction: column; align-items: flex-start; gap: 32px; }
+.hero-second .film-caption p { font-size: clamp(48px,6vw,92px); }
+.full-media-inner { position: static; inset: auto; gap: 32px; grid-template-columns: repeat(2,minmax(0,480px)); justify-content: center; }
+.full-media-inner > img,.full-media-inner > video { width: 100%; height: auto; max-height: none; aspect-ratio: 480/848; object-fit: contain; }
+.full-media.single { display: grid; grid-template-columns: minmax(0,480px) minmax(0,1fr); gap: clamp(32px,6vw,100px); align-items: center; }
+.full-media.single .full-media-inner { width: 100%; }
+.full-media .media-label { position: static; inset: auto; text-shadow: none; gap: 20px; margin-top: 32px; flex-wrap: wrap; }
+.full-media.single .media-label { flex-direction: column; font-size: clamp(20px,3vw,40px); }
+.feature-big video { max-width: 480px; margin-inline: auto; object-fit: contain; }
+.feature-small video { max-width: 320px; aspect-ratio: 512/910; object-fit: contain; }
+.page-hero.has-film { height: auto; min-height: 0; padding: 136px var(--gutter) 64px; display: grid; grid-template-columns: minmax(0,1fr) minmax(0,480px); gap: 40px; align-items: center; background: var(--paper); color: var(--ink); }
+.page-hero.has-film > video { position: static; inset: auto; width: 100%; height: auto; aspect-ratio: 480/848; object-fit: contain; grid-column: 2; grid-row: 1; }
+.page-hero.has-film .page-hero-shade { display: none; }
+.page-hero.has-film h1 { position: static; grid-column: 1; grid-row: 1; font-size: clamp(48px,5.5vw,88px); overflow-wrap: anywhere; }
+@media(max-width:767px) {
+  .hero-second,.full-media.single { grid-template-columns: minmax(0,1fr); gap: 32px; }
+  .hero-second,.full-media { padding-block: 48px; }
+  .hero-second video,.full-media-inner { max-width: 480px; margin-inline: auto; }
+  .full-media-inner { grid-template-columns: minmax(0,1fr); }
+  .full-media.single .media-label { font-size: 22px; }
+  .page-hero.has-film { padding-top: 110px; grid-template-columns: minmax(0,1fr); gap: 32px; }
+  .page-hero.has-film h1 { grid-column: 1; grid-row: 1; font-size: clamp(44px,9vw,68px); }
+  .page-hero.has-film > video { grid-column: 1; grid-row: 2; max-width: 480px; justify-self: center; }
+}
+/* Tablet titles need their own row rather than a narrow leftover column. */
+@media(min-width:768px) and (max-width:1023px) {
+  .page-hero.has-film { grid-template-columns: minmax(0,1fr); gap: 32px; }
+  .page-hero.has-film h1 { grid-column: 1; grid-row: 1; }
+  .page-hero.has-film > video { grid-column: 1; grid-row: 2; max-width: 480px; justify-self: center; }
+}

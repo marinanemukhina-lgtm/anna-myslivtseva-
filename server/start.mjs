@@ -1,12 +1,10 @@
 import "dotenv/config";
 import express from "express";
-import path from "node:path";
+import { createPageHandler } from "./page-response.mjs";
 import { createApp } from "./app.mjs";
 const app = createApp();
-app.use(express.static("dist/client"));
-app.get("/{*path}", (_req, res) =>
-  res.sendFile(path.resolve("dist/client/index.html")),
-);
+app.use(express.static("dist/client", { index: false }));
+app.use(createPageHandler());
 app.listen(Number(process.env.PORT || 4173), "0.0.0.0", () =>
   console.log("Сайт запущен"),
 );

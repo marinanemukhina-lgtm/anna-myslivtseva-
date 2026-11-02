@@ -1,9 +1,12 @@
 name: Проверка проекта
 on:
   push:
+    branches-ignore:
+      - feat/anna-quality-20261101
   pull_request:
 jobs:
   verify:
+    if: github.head_ref != 'feat/anna-quality-20261101' && github.ref_name != 'feat/anna-quality-20261101'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

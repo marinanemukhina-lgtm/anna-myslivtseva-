@@ -2,4 +2,6 @@ User-agent: *
 Disallow: /admin
 Disallow: /demo
 Disallow: /api/
+Allow: /api/content$
+Allow: /api/media/
 Allow: /api/seo/sitemap.xml

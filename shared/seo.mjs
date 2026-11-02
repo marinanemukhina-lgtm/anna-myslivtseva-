@@ -60,3 +60,25 @@ export function sitemapXml(siteUrl, data) {
     '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
     locs.join("\n") + '\n</urlset>\n';
 }
+
+// One explicit primary origin; never derive canonical identity from the request host.
+export function canonicalOrigin(value) {
+  if (!String(value || "").trim()) return null;
+  const url = new URL(String(value).trim());
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash || url.pathname !== "/")
+    throw new Error("PUBLIC_SITE_URL must be an HTTPS origin");
+  return url.origin;
+}
+
+export function canonicalMetadata(path, data, configuredOrigin, currentOrigin) {
+  const origin = canonicalOrigin(configuredOrigin);
+  const info = metadataFor(path, data);
+  return { ...info, origin, canonical: origin ? origin + info.canonicalPath : null,
+    robots: !origin || currentOrigin !== origin ? "noindex, nofollow" : info.robots };
+}
+
+export function robotsText(siteUrl) {
+  const origin = canonicalOrigin(siteUrl);
+  return "User-agent: *\nDisallow: /admin\nDisallow: /demo\nDisallow: /api/\nAllow: /api/content$\nAllow: /api/media/\nAllow: /api/seo/sitemap.xml\n" +
+    (origin ? "Sitemap: " + origin + "/api/seo/sitemap.xml\n" : "");
+}

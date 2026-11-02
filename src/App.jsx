@@ -79,7 +79,7 @@ function Video({ second = false, className = "" }) {
     <video
       ref={ref}
       className={className}
-      src={`/media/anna-session-neutral-0${second ? 2 : 1}.mp4`}
+      src={second ? "/media/anna-session-neutral-02-small.mp4" : "/media/anna-session-neutral-01.mp4"}
       poster={`/media/session-neutral-0${second ? 2 : 1}.jpg`}
       muted
       loop
@@ -355,7 +355,7 @@ function Hero() {
       </nav>
       <div className="hero-second">
         <Video />
-        <div className="film-caption"><span className="eyebrow">Анна Мысливцева</span><p>В процессе<br />работы.</p><span className="eyebrow">Остеопатия</span></div>
+        <div className="film-caption"><span className="eyebrow">Анна Мысливцева</span><p>В процессе<br />работы</p><span className="eyebrow">Остеопатия</span></div>
       </div>
     </section>
   );
@@ -368,9 +368,9 @@ function Intro() {
       <h2 className="intro-title reveal">
         {data.profile.intro || (
           <>
-            Познакомиться.<br />
-            Узнать больше.<br />
-            Сделать свой выбор.
+            Познакомиться<br />
+            Узнать больше<br />
+            Сделать свой выбор
           </>
         )}
       </h2>
@@ -483,13 +483,13 @@ function FourSteps() {
               key={s.to}
               className={`step ${i === active ? "active" : ""}`}
             >
-              <button
+              <Link
+                to={s.to}
                 className="step-picture"
-                onClick={() => setActive(i)}
                 aria-label={s.title}
               >
                 <img src={s.image} alt="" loading="lazy" />
-              </button>
+              </Link>
               <div className="step-copy">
                 <span>({i + 1}).</span>
                 <div>
@@ -509,7 +509,7 @@ function FourSteps() {
 function FullMedia({ single = false }) {
   return (
     <section className={"full-media " + (single ? "single" : "split")}>
-      <div className="full-media-inner" data-parallax>
+      <div className="full-media-inner">
         {single ? (
           <Video />
         ) : (
@@ -544,13 +544,13 @@ function Editorial({ kind = "philosophy" }) {
         <h3 className="reveal">
           {copy || (
             <>
-              {kind === "philosophy" ? "Прежде чем записаться — познакомьтесь со специалистом и его образованием." : "Информация об услугах, стоимости и записи. В одном месте, в вашем ритме."}
+              {kind === "philosophy" ? "Прежде чем записаться — познакомьтесь со специалистом и его образованием" : "Информация об услугах, стоимости и записи. В одном месте, в вашем ритме"}
             </>
           )}
         </h3>
         {kind === "philosophy" && (
-          <Link to="/services" className="small-link">
-            Услуги и цены
+          <Link to="/about" className="small-link">
+            Об Анне и образовании
           </Link>
         )}
       </div>
@@ -561,7 +561,7 @@ function Feature() {
   const { data } = useSite();
   return (
     <section className="feature grid">
-      <h2 className="reveal">За каждым<br />приёмом —<br />человек.</h2>
+      <h2 className="reveal">За каждым<br />приёмом —<br />человек</h2>
       <div className="feature-small">
         <Video second />
         <p>{data.profile.approach || "Познакомьтесь с Анной: биография и сведения об образовании собраны на отдельной странице."}</p>
@@ -634,7 +634,7 @@ function Home() {
 function EducationFeature() {
   const { data } = useSite();
   return <section className="education-feature grid">
-    <div className="education-heading"><span className="eyebrow">Образование и квалификация</span><h2 className="reveal">Образование<br />и дипломы.</h2></div>
+    <div className="education-heading"><span className="eyebrow">Образование и квалификация</span><h2 className="reveal">Образование<br />и дипломы</h2></div>
     <div className="education-description"><p>Дипломы и сертификаты Анны — в отдельном разделе. Каждый опубликованный документ можно рассмотреть в полном размере.</p><Link to="/diplomas" className="text-action">Посмотреть дипломы <span aria-hidden="true">↗</span></Link></div>
     <div className="education-foot"><span>{data.profile.name}</span><span>{data.diplomas.length ? `${data.diplomas.length} документов` : "Образование · Дипломы · Сертификаты"}</span></div>
   </section>;
@@ -647,7 +647,7 @@ function JournalLinks() {
 }
 function PageHero({ first, last, video = false, children }) {
   return (
-    <section className="page-hero">
+    <section className={`page-hero${video ? " has-film" : ""}`}>
       {video ? <Video /> : <Portrait loading="eager" />}
       <div className="page-hero-shade" />
       <h1>
@@ -707,7 +707,7 @@ function Services() {
   };
   return (
     <>
-      <PageHero first="Услуги" last="и стоимость." video />
+      <PageHero first="Услуги" last="и стоимость" video />
       <section ref={section} className="service-section grid" id="services">
         <nav className="section-index">
           <a href="#services" className="small-link">
@@ -776,7 +776,7 @@ function About() {
   const p = data.profile;
   return (
     <>
-      <PageHero first="Анна" last="Мысливцева.">
+      <PageHero first="Анна" last="Мысливцева">
         {p.role}
       </PageHero>
       <section className="about-intro editorial grid">
@@ -822,7 +822,7 @@ function DiplomaGallery({ short = false }) {
         )}
       </div>
       {!data.diplomas.length ? (
-        <div className="documents-empty"><span className="eyebrow">Публикации</span><h3>Документы ещё<br />не опубликованы.</h3><p>Здесь появятся дипломы и сертификаты Анны после загрузки.</p><Link to="/about" className="small-link">Вернуться к знакомству</Link></div>
+        <div className="documents-empty"><span className="eyebrow">Публикации</span><h3>Документы ещё<br />не опубликованы</h3><p>Здесь появятся дипломы и сертификаты Анны после загрузки.</p><Link to="/about" className="small-link">Вернуться к знакомству</Link></div>
       ) : (
         <div className="diploma-grid">
           {(short ? data.diplomas.slice(0, 3) : data.diplomas).map((d) => (
@@ -920,7 +920,7 @@ function Listing({ type, id }) {
     </>
   ) : (
     <>
-      <PageHero first={title} last="Анны Мысливцевой." video />
+      <PageHero first={title} last="Анны Мысливцевой" video />
       <section className="listing-section">
         <div className="section-heading">
           <h2>{title}</h2>
@@ -972,12 +972,12 @@ function Contact() {
   const p = Object.fromEntries(Object.entries(data.profile).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
   return (
     <>
-      <PageHero first="Запись" last="на приём." />
+      <PageHero first="Запись" last="на приём" />
       <Booking profile={p} />
       <section className="contact-section grid">
         <h2>
           Связаться
-          <br />с Анной.
+          <br />с Анной
         </h2>
         <div>
           <Contacts profile={p} />
@@ -1023,7 +1023,7 @@ function NotFound() {
   return (
     <section className="not-found">
       <span className="eyebrow">404</span>
-      <h1>Страница не найдена.</h1>
+      <h1>Страница не найдена</h1>
       <Link to="/" className="small-link">
         На главную
       </Link>
@@ -1035,7 +1035,7 @@ function Diplomas() {
   return <>
     <section className="documents-hero grid">
       <span className="eyebrow">Анна Мысливцева / Образование</span>
-      <h1>Образование<br /><span>и дипломы.</span></h1>
+      <h1>Образование<br /><span>и дипломы</span></h1>
       <Portrait loading="eager" />
       <div><p>{data.profile.qualification || "Дипломы, сертификаты и сведения об образовании специалиста."}</p><a href="#documents" className="text-action">К документам <span aria-hidden="true">↓</span></a></div>
     </section>
@@ -1066,7 +1066,7 @@ export default function App() {
       !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
     );
   const [ready, setReady] = useState(false);
-  useEffect(() => { applySeo(path, data); }, [path, data]);
+  useEffect(() => { if (ready && !error) applySeo(path, data); }, [path, data, ready, error]);
   const root = useRef(null),
     lenis = useRef(null);
   const load = () =>

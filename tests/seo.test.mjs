@@ -4,7 +4,7 @@ import { mkdtemp, rm, readFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { initialContent, publicContent } from "../shared/content.mjs";
-import { indexablePaths, metadataFor, sitemapXml } from "../shared/seo.mjs";
+import { indexablePaths, metadataFor, sitemapXml, canonicalOrigin, canonicalMetadata, robotsText } from "../shared/seo.mjs";
 
 const fixture = () => structuredClone(initialContent);
 test("index is based on published content, no artificial medical claims", () => {
@@ -61,4 +61,28 @@ test("runtime sitemap serves only published routes and is disabled without canon
   delete process.env.PUBLIC_SITE_URL;
   const no=await fetch(base+"/api/seo/sitemap.xml");
   assert.equal(no.status,404);
+});
+
+test("canonical identity uses only explicit origin and previews remain noindex", () => {
+  const data = publicContent(fixture());
+  const primary = canonicalMetadata("/about?tracking=1", data, "https://example.test/", "https://example.test");
+  assert.equal(primary.canonical, "https://example.test/about");
+  assert.equal(primary.robots, "index, follow");
+  const preview = canonicalMetadata("/about", data, "https://example.test/", "https://preview.test");
+  assert.equal(preview.canonical, primary.canonical);
+  assert.equal(preview.robots, "noindex, nofollow");
+  assert.equal(canonicalMetadata("/", data, "", "https://untrusted.test").canonical, null);
+  assert.equal(canonicalMetadata("/", data, "", "https://untrusted.test").robots, "noindex, nofollow");
+  assert.equal(canonicalOrigin(""), null);
+  for (const invalid of ["http://example.test", "https://u:p@example.test", "https://example.test/sub", "https://example.test/?x=1"])
+    assert.throws(() => canonicalOrigin(invalid));
+});
+test("robots publication declares configured sitemap and permits rendering resources", () => {
+  const text = robotsText("https://example.test/");
+  const directives = text.trim().split("\n");
+  assert.ok(directives.includes("Sitemap: https://example.test/api/seo/sitemap.xml"));
+  assert.ok(directives.includes("Allow: /api/content$"));
+  assert.ok(directives.includes("Allow: /api/media/"));
+  assert.ok(directives.includes("Disallow: /admin"));
+  assert.ok(!robotsText("").includes("Sitemap:"));
 });

@@ -3,23 +3,42 @@
   "outputDirectory": "dist/client",
   "framework": null,
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" },
     {
-      "source": "/((?!assets/|media/|favicon.svg|robots.txt).*)",
-      "destination": "/index.html"
+      "source": "/api/:path*",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!assets/|media/|robots.txt).*)",
+      "destination": "/api"
     }
   ],
   "headers": [
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
         {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
         },
-        { "key": "X-Frame-Options", "value": "DENY" }
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        }
       ]
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "feat/anna-quality-20261101": false
+    }
+  },
+  "functions": {
+    "api/index.mjs": {
+      "includeFiles": "dist/client/index.html"
+    }
+  }
 }

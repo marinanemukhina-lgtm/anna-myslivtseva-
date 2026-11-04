@@ -1192,6 +1192,17 @@ export default function App() {
     };
   }, [path, motion, data]);
   const admin = path.startsWith("/admin");
+  useEffect(() => {
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.remove();
+    const isPublic = nav.some(([url]) => url === path) || ["/privacy", "/terms"].includes(path) || ["news", "offers"].some(type => data[type].some(item => path === `/${type}/${item.id}`));
+    if (isPublic) {
+      const link = document.createElement("link");
+      link.rel = "canonical";
+      link.href = "https://anna-myslivtseva.vercel.app" + path;
+      document.head.appendChild(link);
+    }
+  }, [path, data]);
   return (
     <Site.Provider
       value={{

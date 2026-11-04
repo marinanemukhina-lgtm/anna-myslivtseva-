@@ -1196,6 +1196,13 @@ export default function App() {
     const canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) canonical.remove();
     const isPublic = nav.some(([url]) => url === path) || ["/privacy", "/terms"].includes(path) || ["news", "offers"].some(type => data[type].some(item => path === `/${type}/${item.id}`));
+    document.querySelectorAll('meta[name="robots"]').forEach(node => node.remove());
+    if (!isPublic) {
+      const robots = document.createElement("meta");
+      robots.name = "robots";
+      robots.content = "noindex, nofollow";
+      document.head.appendChild(robots);
+    }
     if (isPublic) {
       const link = document.createElement("link");
       link.rel = "canonical";

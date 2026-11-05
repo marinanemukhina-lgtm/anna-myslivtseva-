@@ -122,4 +122,53 @@ if (!process.argv.includes(childFlag)) {
     assert.ok(!JSON.stringify(body).includes('INVALID_TRANSACTION_ACKNOWLEDGEMENT'));
   });
 
+  test('inactive legacy mode accepts empty lock result for content, media and marketing without activating owner state',async()=>{
+    delete process.env.OWNER_HANDOFF_REQUIRED;
+    const {enabled,temporaryAllowed,securityState}=await import('../server/owner-handoff.mjs');
+    const start=calls.length;
+    const emptyLock=result('id',[],25);
+    // This is a synthetic empty-state transport fixture, not a SQL engine.
+    const contents=new Map([['main',{body:'{}',version:1}]]),media=new Map();
+    respond=async body=>{
+      if(!body.queries){
+        assert.ok(["SELECT id FROM owner_security WHERE id='owner'","SELECT * FROM owner_security WHERE id='owner'",'SELECT id FROM owner_sessions'].includes(body.query));
+        return {ok:true,json:async()=>result('id',[],25)};
+      }
+      assert.equal(body.queries.length,2);
+      assert.equal(body.queries[0].query,"SELECT id FROM owner_security WHERE id='owner' FOR UPDATE");
+      const {query:sql,params}=body.queries[1];
+      assert.match(sql,/NOT EXISTS \(SELECT 1 FROM owner_security WHERE id='owner'\)/);
+      let acknowledged;
+      if(sql.startsWith('UPDATE content ')){
+        assert.equal(contents.get(params[1]).version,Number(params[2]));
+        contents.set(params[1],{body:params[0],version:2});acknowledged=result('version',[['2']]);
+      }else if(sql.startsWith('INSERT INTO media ')){
+        media.set(params[0],params.slice(1));acknowledged=result('id',[[params[0]]],25);
+      }else{
+        assert.ok(sql.startsWith('INSERT INTO content '));
+        contents.set(params[0],{body:params[1],version:1});acknowledged=result('id',[[params[0]]],25);
+      }
+      return {ok:true,json:async()=>({results:[emptyLock,acknowledged]})};
+    };
+    try{
+      const status=async()=>({enabled:await enabled(),temporaryAllowed:await temporaryAllowed(),state:await securityState(),sessions:await query('SELECT id FROM owner_sessions')});
+      const before=await status();assert.deepEqual(before,{enabled:false,temporaryAllowed:true,state:null,sessions:[]});
+      for(const [sql,args,expected] of [
+        [update,['{"synthetic":"legacy"}','main',1],[{version:2}]],
+        ['INSERT INTO media (id,mime,body,name) VALUES ($1,$2,$3,$4)',['legacy-media','image/png','synthetic','Synthetic'],[{id:'legacy-media'}]],
+        ['INSERT INTO content (id,body,version) VALUES ($1,$2,1) ON CONFLICT (id) DO NOTHING',['marketing','{"synthetic":"legacy-marketing"}'],[{id:'marketing'}]],
+      ]){
+        const offset=calls.length;
+        assert.deepEqual(await accessContext.run({legacy:true},()=>query(sql,args)),expected);
+        takeBatch(offset);
+      }
+      assert.deepEqual(await status(),before,'inactive access status remains unchanged');
+      assert.deepEqual([...contents],[['main',{body:'{"synthetic":"legacy"}',version:2}],['marketing',{body:'{"synthetic":"legacy-marketing"}',version:1}]]);
+      assert.deepEqual([...media],[['legacy-media',['image/png','synthetic','Synthetic']]]);
+      const statements=calls.slice(start).flatMap(call=>call.body.queries??[call.body]).map(q=>q.query);
+      assert.ok(statements.every(sql=>!/(?:INSERT INTO|UPDATE|DELETE FROM) owner_(?:security|sessions)\b/.test(sql)),'no owner state or session mutation sent');
+      assert.equal(process.env.OWNER_HANDOFF_REQUIRED,undefined);
+    }finally{process.env.OWNER_HANDOFF_REQUIRED='1';}
+  });
+
 }

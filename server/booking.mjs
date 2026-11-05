@@ -30,7 +30,7 @@ export function closePublicIntake(app) {
   });
 }
 
-function snapshot(content) {
+function snapshot(content, req) {
   return {
     settings: content.data.bookingSchedule ?? defaults(),
     version: content.version,
@@ -39,6 +39,7 @@ function snapshot(content) {
       title,
       published,
     })),
+    temporaryCalendarAccess: Boolean(req.temporaryCalendarAccess),
     activationBlocked: true,
     reasons: [message],
     mode: "preparation",
@@ -58,19 +59,19 @@ const conflict = (res) => res.status(409).json({
   error: "Сайт изменён в другой вкладке. Сохраните свои изменения отдельно и загрузите актуальную версию.",
 });
 
-export function registerBookingPreparation(app, requireAdmin) {
+export function registerBookingPreparation(app, requireAdmin, requireCalendarAccess = requireAdmin) {
   app.get("/api/booking/config", (_req, res) => res.json(publicConfig));
   app.get("/api/booking/availability", (_req, res) =>
     res.json({ slots: [], ready: false, mode: "preparation" }),
   );
-  app.get("/api/admin/booking", requireAdmin, async (_req, res, next) => {
+  app.get("/api/admin/booking", requireCalendarAccess, async (req, res, next) => {
     try {
-      res.json(snapshot(await readContent()));
+      res.json(snapshot(await readContent(), req));
     } catch (error) {
       next(error);
     }
   });
-  app.put("/api/admin/booking", requireAdmin, async (req, res, next) => {
+  app.put("/api/admin/booking", requireCalendarAccess, async (req, res, next) => {
     try {
       const parsed = saveSchema.safeParse(req.body);
       if (!parsed.success)
@@ -93,7 +94,7 @@ export function registerBookingPreparation(app, requireAdmin) {
         [JSON.stringify(data), "main", parsed.data.version],
       );
       if (!rows.length) return conflict(res);
-      res.json(snapshot({ data, version: Number(rows[0].version) }));
+      res.json(snapshot({ data, version: Number(rows[0].version) }, req));
     } catch (error) {
       next(error);
     }

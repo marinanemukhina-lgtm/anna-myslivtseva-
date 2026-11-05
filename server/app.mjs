@@ -1,7 +1,8 @@
 import express from "express";
+import { registerMarketing } from "./marketing.mjs";
 import { registerPrivateBooking } from "./booking-occupancy.mjs";
 import { registerPublicPages } from "./public-pages.mjs";
-import { temporaryContentAccess, contentPayload } from "./temporary-content-access.mjs";
+import { temporaryContentAccess, temporaryCalendarAccess, contentPayload } from "./temporary-content-access.mjs";
 import { closePublicIntake, registerBookingPreparation } from "./booking.mjs";
 import { defaults as bookingDefaults } from "../shared/booking.mjs";
 import {
@@ -77,6 +78,18 @@ async function requireContentAccess(req, res, next) {
     next(e);
   }
 }
+async function requireCalendarAccess(req, res, next) {
+  try {
+    if (await isAdmin(req)) return next();
+    if (temporaryCalendarAccess(req)) {
+      req.temporaryCalendarAccess = true;
+      return next();
+    }
+    return res.status(401).json({ error: "Войдите в панель управления." });
+  } catch (e) {
+    next(e);
+  }
+}
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
@@ -129,6 +142,7 @@ export function createApp() {
       res.json({
         authenticated: await isAdmin(req),
         temporaryContentAccess: temporaryContentAccess(req),
+        temporaryCalendarAccess: temporaryCalendarAccess(req),
         configured:
           !!process.env.ADMIN_PASSWORD_HASH &&
           (!process.env.VERCEL || !!process.env.DATABASE_URL),
@@ -324,7 +338,8 @@ export function createApp() {
       next(e);
     }
   });
-  registerBookingPreparation(app, requireAdmin);
+  registerBookingPreparation(app, requireAdmin, requireCalendarAccess);
+  registerMarketing(app, requireAdmin);
   registerPrivateBooking(app, requireAdmin);
   registerPublicPages(app);
   app.use("/api", (_req, res) =>

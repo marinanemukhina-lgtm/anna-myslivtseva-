@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { defaults } from '../../shared/booking.mjs';
 
 // Existing synthetic password from scripts/qa-server.mjs, never a real secret.
 const password = 'browser-fixture-only-password';
@@ -25,6 +26,7 @@ async function temporaryEditor({ page, request, baseURL }, options = {}) {
     await route.fulfill({ response, json: {
       ...session,
       temporaryContentAccess: state.temporary,
+      temporaryCalendarAccess: Boolean(state.temporary && state.calendar),
       ...(state.configured === undefined ? {} : { configured: state.configured }),
     } });
   });
@@ -34,10 +36,25 @@ async function temporaryEditor({ page, request, baseURL }, options = {}) {
     if (response.status() !== 401 || !state.temporary) return route.fulfill({ response });
     await route.fulfill({ status: 200, json: { ...original, data: content } });
   });
+  if (state.calendar) {
+    let schedule = {settings: bookingSchedule || defaults(), version: original.version, serviceCatalog: original.data.services.map(({id,title,published}) => ({id,title,published})), temporaryCalendarAccess:true, activationBlocked:true};
+    schedule.serviceCatalog = [{id:'temporary-fixture',title:'Тестовая услуга',published:true}];
+    schedule.settings = defaults();
+    await page.route('**/api/admin/booking', async route => {
+      const response = await route.fetch();
+      if (response.status() !== 401 || !state.temporary) return route.fulfill({response});
+      if (route.request().method() === 'PUT') {
+        const input = route.request().postDataJSON();
+        if (input.version !== schedule.version) return route.fulfill({status:409,json:{error:'Конфликт версии.'}});
+        schedule = {...schedule, settings:input.settings, version:schedule.version+1};
+      }
+      await route.fulfill({status:200,json:schedule});
+    });
+  }
   await page.goto('/admin');
   await expect(ownerEntry(page)).toBeVisible();
   await expect(page.getByLabel('Специализация', { exact: true })).toBeVisible();
-  await expect(calendar(page)).toHaveCount(0);
+  await expect(calendar(page)).toHaveCount(state.calendar ? 1 : 0);
   expect((await page.request.get('/api/admin/booking')).status()).toBe(401);
   return { state, original, headers };
 }
@@ -272,4 +289,56 @@ test('owner login never rebases an old draft onto a newer server version', async
     expect((await request.put('/api/admin/content', { headers, data: { version: current.version, data: original.data } })).ok()).toBe(true);
     await request.delete('/api/session', { headers });
   }
+});
+
+test('temporary schedule edits hours without private calls, then owner login and logout change scope', async ({ page, request, baseURL }) => {
+  await temporaryEditor({page,request,baseURL}, {calendar:true});
+  const privateCalls = [];
+  page.on('request', request => {
+    if (/\/api\/admin\/booking\//.test(request.url())) privateCalls.push(request.url());
+  });
+  await calendar(page).click();
+  await expect(page.getByRole('heading',{name:'Доступны только рабочие часы',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Проверить свободное время',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('heading',{name:'Обычная неделя',exact:true})).toBeVisible();
+  await page.getByLabel('Запись вперёд, дней',{exact:true}).fill('43');
+  await page.getByLabel('Часовой пояс',{exact:true}).fill('Europe/Moscow');
+  await page.getByLabel('Длительность: Тестовая услуга',{exact:true}).fill('45');
+  await page.getByRole('button',{name:'Добавить интервал: Понедельник',exact:true}).click();
+  await page.getByLabel('Понедельник: начало 1',{exact:true}).fill('09:00');
+  await page.getByLabel('Понедельник: конец 1',{exact:true}).fill('12:00');
+  await page.getByLabel('Выбранная дата',{exact:true}).fill('2026-11-09');
+  await page.getByLabel('Режим дня',{exact:true}).selectOption('closed');
+  const savedRequest = page.waitForRequest(request => request.url().endsWith('/api/admin/booking') && request.method() === 'PUT');
+  await page.getByRole('button',{name:'Сохранить расписание',exact:true}).click();
+  await expect(page.getByText('Расписание сохранено. Онлайн-запись остаётся закрытой.',{exact:true})).toBeVisible();
+  const submitted = (await savedRequest).postDataJSON();
+  expect(submitted.settings.weeklyHours['1']).toEqual([{start:'09:00',end:'12:00'}]);
+  expect(submitted.settings.services[0].durationMinutes).toBe(45);
+  expect(submitted.settings.overrides).toContainEqual({date:'2026-11-09',closed:true,windows:[]});
+  await page.getByLabel('Выбранная дата',{exact:true}).fill('2026-11-09');
+  expect(privateCalls).toEqual([]);
+  await login(page);
+  await expect(page.getByRole('heading',{name:'Проверить свободное время',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Доступны только рабочие часы',exact:true})).toHaveCount(0);
+  await expect.poll(() => privateCalls.some(url => url.includes('/occupancy'))).toBe(true);
+  await page.getByRole('button',{name:'Выйти',exact:true}).click();
+  await expect(ownerEntry(page)).toBeVisible();
+  privateCalls.length = 0;
+  await calendar(page).click();
+  await expect(page.getByRole('heading',{name:'Доступны только рабочие часы',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Проверить свободное время',exact:true})).toHaveCount(0);
+  expect(privateCalls).toEqual([]);
+});
+
+test('temporary calendar draft is not discarded by cancelled owner login', async ({ page, request, baseURL }) => {
+  await temporaryEditor({page,request,baseURL}, {calendar:true});
+  await calendar(page).click();
+  await page.getByLabel('Запись вперёд, дней',{exact:true}).fill('44');
+  await ownerEntry(page).click();
+  await ownerForm(page).getByLabel('Пароль',{exact:true}).fill(password);
+  page.once('dialog',dialog => dialog.dismiss());
+  await ownerForm(page).getByRole('button',{name:'Войти',exact:true}).click();
+  await expect(page.getByLabel('Запись вперёд, дней',{exact:true})).toHaveValue('44');
+  expect((await (await page.request.get('/api/session')).json()).authenticated).toBe(false);
 });

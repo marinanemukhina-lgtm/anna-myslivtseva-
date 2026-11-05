@@ -21,7 +21,7 @@ function Windows({ value, onChange, label }) {
     <label className="calendar-endofday"><input type="checkbox" checked={window.end === '24:00'} onChange={event => update(index, 'end', event.target.checked ? '24:00' : '')} />До конца дня (24:00)<span className="visually-hidden">: {label}, интервал {index + 1}</span></label>
   </div>)}<button type="button" className="text-button" onClick={() => onChange([...value, { start: '', end: '' }])}>Добавить интервал<span className="visually-hidden">: {label}</span></button></div>;
 }
-export default function AdminCalendar({ services, onDirtyChange, onUnauthenticated, onSaved, onBusyChange }) {
+export default function AdminCalendar({ temporaryCalendarAccess = false, services, onDirtyChange, onUnauthenticated, onSaved, onBusyChange }) {
   const [snapshot, setSnapshot] = useState(null), [settings, setSettings] = useState(null), [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false), [occupancyBusy, setOccupancyBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [month, setMonth] = useState(dateInZone('UTC').slice(0, 7)), [selectedDate, setSelectedDate] = useState('');
@@ -40,13 +40,13 @@ export default function AdminCalendar({ services, onDirtyChange, onUnauthenticat
   useEffect(() => { onBusyChange(busy || occupancyBusy); return () => onBusyChange(false); }, [busy, occupancyBusy, onBusyChange]);
   useEffect(() => {
     setPreviewSlots([]); setPreviewTimezone(''); setPreviewReady(false); setPreviewValidity(null); setSlotsLoading(false);
-    if (!previewService || !selectedDate || dirty) return;
+    if (temporaryCalendarAccess || snapshot?.temporaryCalendarAccess || !previewService || !selectedDate || dirty) return;
     const controller = new AbortController(); setSlotsLoading(true);
     bookingApi(`/api/admin/booking/free-availability?${new URLSearchParams({ serviceId: previewService, date: selectedDate })}`, { signal: controller.signal })
       .then(value => { if (controller.signal.aborted) return; setPreviewSlots(value.slots); setPreviewTimezone(value.timezone || ''); setPreviewReady(value.ready === true && Date.parse(value.validUntil) > Date.now()); setPreviewValidity(value.observedAt && value.validUntil ? {observedAt:value.observedAt,validUntil:value.validUntil} : null); }).catch(err => { if (err.name !== 'AbortError') handleError(err); })
       .finally(() => { if (!controller.signal.aborted) setSlotsLoading(false); });
     return () => controller.abort();
-  }, [previewService, selectedDate, dirty, refresh]);
+  }, [temporaryCalendarAccess, snapshot?.temporaryCalendarAccess, previewService, selectedDate, dirty, refresh]);
   useEffect(() => {
     if (!previewReady || !previewValidity) return;
     const remaining = Date.parse(previewValidity.validUntil) - Date.now();
@@ -71,6 +71,7 @@ export default function AdminCalendar({ services, onDirtyChange, onUnauthenticat
     finally { lock.current = false; setBusy(false); }
   }
   if (!settings) return <section className="admin-card">{error ? <><p role="alert" className="admin-error">{error}</p><button type="button" className="text-button" onClick={read}>Повторить загрузку</button></> : <p role="status">Загрузка календаря…</p>}</section>;
+  const limited = temporaryCalendarAccess || snapshot.temporaryCalendarAccess;
   const catalog = snapshot.serviceCatalog || services;
   const override = settings.overrides.find(item => item.date === selectedDate);
   const overrideMode = !override ? 'weekly' : override.closed ? 'closed' : 'custom';
@@ -114,6 +115,7 @@ export default function AdminCalendar({ services, onDirtyChange, onUnauthenticat
         <div className="calendar-save"><span>{dirty ? 'Расписание ещё не сохранено' : 'Расписание сохранено'}</span><button type="submit" className="admin-primary" disabled={!dirty || busy || occupancyBusy}>{busy ? 'Сохраняем…' : 'Сохранить расписание'}</button></div>
       </fieldset>
     </form>
+    {limited ? <section className="admin-card"><h2>Доступны только рабочие часы</h2><p>Это открытый редактор расписания: любой посетитель может менять часы, длительность услуг и отдельные даты. Занятость, импорт и проверка свободного времени доступны только владельцу по паролю. Рабочие часы не означают, что время свободно. Онлайн-запись закрыта.</p></section> : <>
     <section className="admin-card calendar-preview"><h2>Проверить свободное время</h2><p className="calendar-hint">Расчёт по сохранённым часам и сверенной занятости, с учётом перерывов. Это не запись: клиентские данные не собираются, время не бронируется.</p>
       <label className="admin-field"><span>Услуга для проверки</span><select value={previewService} onChange={event => setPreviewService(event.target.value)}><option value="">Выберите услугу</option>{catalog.filter(service => service.published && settings.services.some(item => item.serviceId === service.id && item.enabled)).map(service => <option key={service.id} value={service.id}>{service.title}</option>)}</select></label>
       <p className="calendar-hint">Дата: {selectedDate || 'выберите день в календаре выше'}. Часовой пояс: {previewTimezone || settings.timezone || 'не задан'}.</p>
@@ -127,5 +129,6 @@ export default function AdminCalendar({ services, onDirtyChange, onUnauthenticat
       setRefresh(current => current + 1);
       if (saved.settings) onSaved?.(previousVersion, saved);
     }} />
+    </>}
   </div>;
 }

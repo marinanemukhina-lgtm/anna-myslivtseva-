@@ -7,6 +7,8 @@ const syntheticPassword = "Синтетический-test-🌿-123";
 test("setup is explicit, local-only, Node-compatible and clearable", async ({ page }, testInfo) => {
   await page.goto("/admin/setup");
   await expect(page.getByRole("heading", { name: "Подготовка пароля" })).toBeVisible();
+  await expect(page.getByLabel("Как работает страница")).toContainText("Это подготовка значения, а не установка пароля");
+  await expect(page.getByLabel("Как работает страница")).toContainText("Временный открытый доступ не отключится автоматически");
   const password = page.getByLabel("Новый пароль", { exact: true });
   const confirmation = page.getByLabel("Повторите пароль", { exact: true });
   const generate = page.getByRole("button", { name: "Сформировать хеш", exact: true });

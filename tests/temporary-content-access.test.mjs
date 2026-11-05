@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
+import { scryptSync } from 'node:crypto';
 import { temporaryContentAccess } from '../server/temporary-content-access.mjs';
 
 const host = 'anna-myslivtseva.vercel.app';
@@ -81,6 +82,33 @@ test('open content editor preserves protected schedule and does not create authe
   assert.equal((await request('/api/media','POST',{name:'bad.svg',type:'image/svg+xml',base64:'PHN2Zz4='})).status,400);
   const sessions = await query('SELECT count(*) AS count FROM sessions');
   assert.equal(Number(sessions[0].count),0);
+  // The public content mode must not prevent a real password-authenticated
+  // owner session, and that session must still be required for the calendar.
+  const previousHash = process.env.ADMIN_PASSWORD_HASH;
+  process.env.ADMIN_PASSWORD_HASH = 'owner-fixture:' + scryptSync('synthetic-owner-password', 'owner-fixture', 64).toString('hex');
+  try {
+    const wrong = await request('/api/session', 'POST', {password:'synthetic-wrong-password'});
+    assert.equal(wrong.status,401);
+    assert.equal(wrong.headers.get('set-cookie'),null);
+    assert.equal((await request('/api/admin/booking/occupancy')).status,401);
+    const login = await request('/api/session', 'POST', {password:'synthetic-owner-password'});
+    assert.equal(login.status,200);
+    const setCookie = login.headers.get('set-cookie');
+    assert.match(setCookie,/HttpOnly/i);assert.match(setCookie,/Secure/i);assert.match(setCookie,/SameSite=Strict/i);
+    const owner = {cookie:setCookie.split(';')[0]};
+    const signedIn = await (await request('/api/session','GET',undefined,owner)).json();
+    assert.equal(signedIn.authenticated,true);assert.equal(signedIn.temporaryContentAccess,true);
+    assert.equal((await request('/api/admin/booking','GET',undefined,owner)).status,200);
+    assert.equal((await request('/api/admin/booking/occupancy','GET',undefined,owner)).status,200);
+    assert.ok((await (await request('/api/admin/content','GET',undefined,owner)).json()).data.bookingSchedule);
+    assert.equal((await request('/api/session','DELETE',undefined,owner)).status,200);
+    assert.equal((await (await request('/api/session','GET',undefined,owner)).json()).authenticated,false);
+    assert.equal((await request('/api/admin/booking/occupancy','GET',undefined,owner)).status,401);
+    const publicAgain = await request('/api/admin/content','GET',undefined,owner);
+    assert.equal(publicAgain.status,200);assert.equal('bookingSchedule' in (await publicAgain.json()).data,false);
+  } finally {
+    if(previousHash === undefined) delete process.env.ADMIN_PASSWORD_HASH; else process.env.ADMIN_PASSWORD_HASH = previousHash;
+  }
   process.env.VERCEL_ENV = 'preview';
   assert.equal((await request('/api/admin/content')).status,401);
   assert.equal((await request(media.url)).status,404);

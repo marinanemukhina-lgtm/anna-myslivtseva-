@@ -1107,12 +1107,16 @@ export default function App() {
   };
   useEffect(() => {
     document.documentElement.lang = "ru";
-    document.title =
+    const articlePath = /^\/(news|offers)\/[^/]+$/.test(path);
+    if (articlePath && (!ready || error)) return;
+    const articleType = path.split("/")[1];
+    const article = articlePath ? data[articleType].find(item => path === `/${articleType}/${item.id}`) : null;
+    document.title = article?.title || (
       path === "/admin"
         ? "Панель управления · Анна Мысливцева"
         : (nav.find((x) => x[0] === path)?.[1] || "Анна Мысливцева") +
-          " · Остеопат";
-  }, [path]);
+          " · Остеопат");
+  }, [path, data, ready, error]);
   useEffect(() => {
     if (!motion || path.startsWith("/admin")) return;
     const l = new Lenis({ duration: 1.15, smoothWheel: true });
@@ -1192,6 +1196,26 @@ export default function App() {
     };
   }, [path, motion, data]);
   const admin = path.startsWith("/admin");
+  useEffect(() => {
+    // Keep server metadata while a published article is still loading or fetch fails.
+    if (/^\/(news|offers)\/[^/]+$/.test(path) && (!ready || error)) return;
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) canonical.remove();
+    const isPublic = nav.some(([url]) => url === path) || ["/privacy", "/terms"].includes(path) || ["news", "offers"].some(type => data[type].some(item => path === `/${type}/${item.id}`));
+    document.querySelectorAll('meta[name="robots"]').forEach(node => node.remove());
+    if (!isPublic) {
+      const robots = document.createElement("meta");
+      robots.name = "robots";
+      robots.content = "noindex, nofollow";
+      document.head.appendChild(robots);
+    }
+    if (isPublic) {
+      const link = document.createElement("link");
+      link.rel = "canonical";
+      link.href = "https://anna-myslivtseva.vercel.app" + path;
+      document.head.appendChild(link);
+    }
+  }, [path, data, ready, error]);
   return (
     <Site.Provider
       value={{

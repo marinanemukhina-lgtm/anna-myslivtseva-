@@ -1,4 +1,5 @@
 import express from "express";
+import { registerPublicPages } from "./public-pages.mjs";
 import { temporaryContentAccess, contentPayload } from "./temporary-content-access.mjs";
 import { closePublicIntake, registerBookingPreparation } from "./booking.mjs";
 import { defaults as bookingDefaults } from "../shared/booking.mjs";
@@ -314,6 +315,7 @@ export function createApp() {
     }
   });
   registerBookingPreparation(app, requireAdmin);
+  registerPublicPages(app);
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "Страница не найдена." }),
   );

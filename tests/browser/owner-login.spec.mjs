@@ -304,11 +304,11 @@ test('temporary schedule edits hours without private calls, then owner login and
   await page.getByLabel('Запись вперёд, дней',{exact:true}).fill('43');
   await page.getByLabel('Часовой пояс',{exact:true}).fill('Europe/Moscow');
   await page.getByLabel('Длительность: Тестовая услуга',{exact:true}).fill('45');
-  await page.getByRole('button',{name:'Добавить интервал: Понедельник',exact:true}).click();
+  await page.getByRole('button',{name:'Добавить интервал : Понедельник',exact:true}).click();
   await page.getByLabel('Понедельник: начало 1',{exact:true}).fill('09:00');
   await page.getByLabel('Понедельник: конец 1',{exact:true}).fill('12:00');
   await page.getByLabel('Выбранная дата',{exact:true}).fill('2026-11-09');
-  await page.getByLabel('Режим дня',{exact:true}).selectOption('closed');
+  await page.getByRole('combobox',{name:'Режим дня',exact:true}).selectOption('closed');
   const savedRequest = page.waitForRequest(request => request.url().endsWith('/api/admin/booking') && request.method() === 'PUT');
   await page.getByRole('button',{name:'Сохранить расписание',exact:true}).click();
   await expect(page.getByText('Расписание сохранено. Онлайн-запись остаётся закрытой.',{exact:true})).toBeVisible();

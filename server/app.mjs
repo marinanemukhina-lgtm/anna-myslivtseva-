@@ -1,5 +1,6 @@
 import express from "express";
-import { enabled as handoffEnabled, securityState, matches, registerOwnerHandoff, temporaryAllowed } from './owner-handoff.mjs';
+import { OWNER_HANDOFF_ACTIVE } from '../shared/owner-handoff-mode.mjs';
+import { securityState, matches, registerOwnerHandoff, temporaryAllowed } from './owner-handoff.mjs';
 import { accessContext, OWNER_SESSION_INSERT } from './db.mjs';
 import { registerMarketing } from "./marketing.mjs";
 import { registerPrivateBooking } from "./booking-occupancy.mjs";
@@ -54,7 +55,7 @@ async function isAdmin(req) {
   const token = cookie(req);
   if (!/^[a-f0-9]{64}$/.test(token)) return false;
   const { query } = await database();
-  if (await handoffEnabled()) {
+  if (OWNER_HANDOFF_ACTIVE) {
     const state=await securityState();
     if (!state) return false;
     const [session]=await query('SELECT expires,epoch FROM owner_sessions WHERE id=$1',[hash(token)]);
@@ -72,6 +73,7 @@ async function requireAdmin(req, res, next) {
   try {
     if (!(await isAdmin(req)))
       return res.status(401).json({ error: "Войдите в панель управления." });
+    if (!OWNER_HANDOFF_ACTIVE) return next();
     accessContext.run(req.ownerEpoch ? {epoch:req.ownerEpoch,sessionId:req.ownerSessionId}:{legacy:true},next);
   } catch (e) {
     next(e);
@@ -79,9 +81,10 @@ async function requireAdmin(req, res, next) {
 }
 async function requireContentAccess(req, res, next) {
   try {
-    if (await isAdmin(req)) return accessContext.run(req.ownerEpoch ? {epoch:req.ownerEpoch,sessionId:req.ownerSessionId}:{legacy:true},next);
+    if (await isAdmin(req)) return OWNER_HANDOFF_ACTIVE ? accessContext.run({epoch:req.ownerEpoch,sessionId:req.ownerSessionId},next) : next();
     if (temporaryContentAccess(req) && await temporaryAllowed()) {
       req.contentOnlyAccess = true;
+      if (!OWNER_HANDOFF_ACTIVE) return next();
       const state=await securityState();
       return accessContext.run(state ? {temporary:true,epoch:state.epoch}:{legacy:true},next);
     }
@@ -92,9 +95,10 @@ async function requireContentAccess(req, res, next) {
 }
 async function requireCalendarAccess(req, res, next) {
   try {
-    if (await isAdmin(req)) return accessContext.run(req.ownerEpoch ? {epoch:req.ownerEpoch,sessionId:req.ownerSessionId}:{legacy:true},next);
+    if (await isAdmin(req)) return OWNER_HANDOFF_ACTIVE ? accessContext.run({epoch:req.ownerEpoch,sessionId:req.ownerSessionId},next) : next();
     if (temporaryCalendarAccess(req) && await temporaryAllowed()) {
       req.temporaryCalendarAccess = true;
+      if (!OWNER_HANDOFF_ACTIVE) return next();
       const state=await securityState();
       return accessContext.run(state ? {temporary:true,epoch:state.epoch}:{legacy:true},next);
     }
@@ -157,7 +161,7 @@ export function createApp() {
         temporaryContentAccess: temporaryContentAccess(req) && await temporaryAllowed(),
         temporaryCalendarAccess: temporaryCalendarAccess(req) && await temporaryAllowed(),
         configured:
-          (await handoffEnabled() ? !!(await securityState()) : !!process.env.ADMIN_PASSWORD_HASH) &&
+          (OWNER_HANDOFF_ACTIVE ? !!(await securityState()) : !!process.env.ADMIN_PASSWORD_HASH) &&
           (!process.env.VERCEL || !!process.env.DATABASE_URL),
       });
     } catch (e) {
@@ -168,7 +172,7 @@ export function createApp() {
   });
   app.post("/api/session", async (req, res, next) => {
     try {
-      const durable=await handoffEnabled(), state=durable ? await securityState() : null;
+      const durable=OWNER_HANDOFF_ACTIVE, state=durable ? await securityState() : null;
       if (durable ? !state : !process.env.ADMIN_PASSWORD_HASH)
         return res
           .status(503)
@@ -209,7 +213,7 @@ export function createApp() {
     try {
       const { query } = await database();
       await query("DELETE FROM sessions WHERE id=$1", [hash(cookie(req))]);
-      await query("DELETE FROM owner_sessions WHERE id=$1", [hash(cookie(req))]);
+      if (OWNER_HANDOFF_ACTIVE) await query("DELETE FROM owner_sessions WHERE id=$1", [hash(cookie(req))]);
       res.clearCookie(cookieName, {
         path: "/",
         httpOnly: true,
@@ -221,7 +225,7 @@ export function createApp() {
       next(e);
     }
   });
-  registerOwnerHandoff(app,isAdmin);
+  if (OWNER_HANDOFF_ACTIVE) registerOwnerHandoff(app,isAdmin);
   app.get("/api/admin/content", requireContentAccess, async (req, res, next) => {
     try {
       res.json(contentPayload(req, await readContent()));
@@ -324,7 +328,7 @@ export function createApp() {
         "INSERT INTO media (id,mime,body,name) VALUES ($1,$2,$3,$4)",
         [id, type, base64, String(name || "Файл").slice(0, 200)],
       );
-      if (Array.isArray(inserted) && !inserted.length) return res.status(409).json({error:'Доступ изменился. Войдите снова.'});
+      if (OWNER_HANDOFF_ACTIVE && Array.isArray(inserted) && !inserted.length) return res.status(409).json({error:'Доступ изменился. Войдите снова.'});
       res.status(201).json({ url: "/api/media/" + id, type, name });
     } catch (e) {
       next(e);

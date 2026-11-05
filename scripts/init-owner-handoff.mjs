@@ -1,7 +1,12 @@
 // Deliberate operator-only initialization. Never called by the app/start/build.
 // No dotenv loading: operator must explicitly select the target environment.
-import { database } from '../server/db.mjs';
-import { validHash } from '../server/owner-handoff.mjs';
+import { OWNER_HANDOFF_ACTIVE } from '../shared/owner-handoff-mode.mjs';
+if (!OWNER_HANDOFF_ACTIVE) {
+  console.error('Owner handoff initialization is unavailable in this disabled release.');
+  process.exit(1);
+}
+// No database module, client, filesystem or credential handling before the gate.
+const { validHash } = await import('../server/owner-handoff.mjs');
 if (process.argv[2] !== '--initialize-existing-owner' || process.env.OWNER_HANDOFF_REQUIRED !== '1') {
   console.error('Explicit --initialize-existing-owner and OWNER_HANDOFF_REQUIRED=1 required.');
   process.exitCode=1;
@@ -9,6 +14,7 @@ if (process.argv[2] !== '--initialize-existing-owner' || process.env.OWNER_HANDO
   console.error('Existing owner password hash is missing or invalid.');
   process.exitCode=1;
 } else {
+  const { database } = await import('../server/db.mjs');
   const {query}=await database();
   const rows=await query("INSERT INTO owner_security (id,password_hash,epoch,complete,temporary_open) VALUES ('owner',$1,1,0,1) ON CONFLICT (id) DO NOTHING RETURNING id",[process.env.ADMIN_PASSWORD_HASH]);
   if (rows.length) console.log('Owner state initialized. Existing legacy sessions are invalid. No invitation issued.');

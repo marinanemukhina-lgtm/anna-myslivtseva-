@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { OWNER_HANDOFF_ACTIVE } from "../../shared/owner-handoff-mode.mjs";
+test.skip(!OWNER_HANDOFF_ACTIVE, "Owner claim runs only in the isolated active source build.");
 
 // Only synthetic fixtures. No real invitation/password, production endpoint or screenshots.
 const invitation = "a".repeat(64);

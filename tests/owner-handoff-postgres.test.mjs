@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {createActiveOwnerSource} from './helpers/active-owner-source.mjs';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -127,8 +128,9 @@ test('real PostgreSQL 16: synthetic owner transfer and commit-time fencing',{
  const run=runner(configuration(process.env));
  const {rows:[identity]}=await run(envelope(`SELECT current_database() AS database,current_user AS role,current_setting('server_version_num')::integer AS version,(SELECT count(*)::integer FROM information_schema.tables WHERE table_schema NOT IN ('pg_catalog','information_schema') AND table_schema !~ '^booking_test_[a-f0-9]{24}$') AS foreign_tables`));
  assert.equal(identity.database,'booking_synthetic');assert.equal(identity.role,'booking_synthetic');assert.ok(identity.version>=160000&&identity.version<170000);assert.equal(identity.foreign_tables,0);
- const {guardMutation,OWNER_SECURITY_DDL,OWNER_SESSIONS_DDL,OWNER_SESSION_INSERT}=await import('../server/db.mjs');
- const {OWNER_REDEEM_SQL,encodePassword,digest}=await import('../server/owner-handoff.mjs');
+ const source=await createActiveOwnerSource(t);
+ const {guardMutation,OWNER_SECURITY_DDL,OWNER_SESSIONS_DDL,OWNER_SESSION_INSERT}=await source.import('server/db.mjs');
+ const {OWNER_REDEEM_SQL,encodePassword,digest}=await source.import('server/owner-handoff.mjs');
  const oldHash=encodePassword('synthetic-old-password'),newHash=encodePassword('synthetic-new-password');
  const token='a'.repeat(64),now=Date.now(),session='b'.repeat(64);
  function literal(value){if(value===null)return 'NULL';if(typeof value==='number'){assert.ok(Number.isSafeInteger(value));return String(value);}return sqlText(value);}
@@ -160,33 +162,23 @@ test('real PostgreSQL 16: synthetic owner transfer and commit-time fencing',{
   assert.fail('Synthetic transaction did not acquire its synchronization marker');
  }
  const hold=key=>`DO $hold$ BEGIN PERFORM pg_advisory_xact_lock(${key}); PERFORM pg_sleep(1); END $hold$;`;
- await t.test('inactive legacy mode with empty owner tables preserves content, media and marketing writes',async context=>{
-  const previous=process.env.OWNER_HANDOFF_REQUIRED;
-  delete process.env.OWNER_HANDOFF_REQUIRED;
-  context.after(()=>{if(previous===undefined)delete process.env.OWNER_HANDOFF_REQUIRED;else process.env.OWNER_HANDOFF_REQUIRED=previous;});
+ await t.test('active empty state never permits legacy writes with env unset, 0 or 1',async context=>{
   const f=await fixture(context,{initialized:false});
-  const stateSql="SELECT (SELECT count(*)::integer FROM owner_security) AS owners,(SELECT count(*)::integer FROM owner_sessions) AS sessions";
-  const before=(await f.raw(envelope(stateSql))).rows;
-  assert.deepEqual(before,[{owners:0,sessions:0}]);
-  // An empty SELECT FOR UPDATE is a valid first result, not an auth failure.
-  const emptyLock=await f.raw(`BEGIN ISOLATION LEVEL READ COMMITTED; ${envelope("SELECT id FROM owner_security WHERE id='owner' FOR UPDATE")} COMMIT;`);
-  assert.deepEqual(emptyLock.rows,[]);
-  for(const [sql,args,expected] of [
-   [casSql,['{"synthetic":"legacy-changed"}','main',1],[{version:2}]],
-   ['INSERT INTO media (id,mime,body,name) VALUES ($1,$2,$3,$4)',['legacy-media','image/png','synthetic','Synthetic'],[{id:'legacy-media'}]],
-   ['INSERT INTO content (id,body,version) VALUES ($1,$2,1) ON CONFLICT (id) DO NOTHING',['marketing','{"synthetic":"legacy-marketing"}'],[{id:'marketing'}]],
-  ]){
-   const g=guardMutation(sql,args,{legacy:true});
-   assert.match(g.statement,/NOT EXISTS \(SELECT 1 FROM owner_security WHERE id='owner'\)/);
-   assert.deepEqual((await f.raw(`BEGIN ISOLATION LEVEL READ COMMITTED; ${lock} ${changed(bind(g.statement,g.args))} COMMIT;`)).rows,expected);
+  const previous=process.env.OWNER_HANDOFF_REQUIRED;
+  context.after(()=>{if(previous===undefined)delete process.env.OWNER_HANDOFF_REQUIRED;else process.env.OWNER_HANDOFF_REQUIRED=previous;});
+  for(const flag of [undefined,'0','1']){
+   if(flag===undefined)delete process.env.OWNER_HANDOFF_REQUIRED;else process.env.OWNER_HANDOFF_REQUIRED=flag;
+   for(const [sql,args] of [
+    [casSql,['{"synthetic":"legacy"}','main',1]],
+    ['INSERT INTO media (id,mime,body,name) VALUES ($1,$2,$3,$4)',['legacy-media','image/png','synthetic','Synthetic']],
+    ['INSERT INTO content (id,body,version) VALUES ($1,$2,1) ON CONFLICT (id) DO NOTHING',['marketing','{}']],
+   ]){
+    const g=guardMutation(sql,args,{legacy:true});assert.match(g.statement,/1=0/);
+    assert.deepEqual((await f.raw(`BEGIN ISOLATION LEVEL READ COMMITTED; ${lock} ${changed(bind(g.statement,g.args))} COMMIT;`)).rows,[]);
+   }
   }
-  assert.deepEqual((await f.raw(envelope("SELECT id,body,version FROM content ORDER BY id"))).rows,[
-   {id:'main',body:'{"synthetic":"legacy-changed"}',version:2},
-   {id:'marketing',body:'{"synthetic":"legacy-marketing"}',version:1},
-  ]);
-  assert.deepEqual((await f.raw(envelope('SELECT id,mime,body,name FROM media'))).rows,[{id:'legacy-media',mime:'image/png',body:'synthetic',name:'Synthetic'}]);
-  assert.deepEqual((await f.raw(envelope(stateSql))).rows,before,'legacy writes must not initialize owner state, create sessions or activate handoff');
-  assert.equal(process.env.OWNER_HANDOFF_REQUIRED,undefined);
+  assert.deepEqual((await f.raw(envelope("SELECT id,version FROM content"))).rows,[{id:'main',version:1}]);
+  assert.deepEqual((await f.raw(envelope('SELECT id FROM media'))).rows,[]);
  });
  await t.test('parallel redemption consumes one invitation and fences old login/session writes',async context=>{
   const f=await fixture(context);

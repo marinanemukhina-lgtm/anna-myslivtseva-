@@ -6,6 +6,8 @@ on:
       - '.github/workflows/booking-postgres.yml'
       - 'tests/private-booking-postgres.test.mjs'
       - 'tests/owner-handoff-postgres.test.mjs'
+      - 'tests/helpers/active-owner-source.mjs'
+      - 'shared/owner-handoff-mode.mjs'
       - 'server/db.mjs'
       - 'server/owner-handoff.mjs'
       - 'server/private-booking-state.mjs'

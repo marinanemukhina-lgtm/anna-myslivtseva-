@@ -1,10 +1,7 @@
 import { randomBytes, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import { database } from './db.mjs';
-export async function enabled() {
-  if (process.env.OWNER_HANDOFF_REQUIRED === '1') return true;
-  const {query}=await database();
-  return (await query("SELECT id FROM owner_security WHERE id='owner'")).length > 0;
-}
+import { OWNER_HANDOFF_ACTIVE } from '../shared/owner-handoff-mode.mjs';
+export async function enabled() { return OWNER_HANDOFF_ACTIVE; }
 export const digest = value => createHash('sha256').update(value).digest('hex');
 export const validHash = value => typeof value === 'string' && /^[a-f0-9]{32,128}:[a-f0-9]{128}$/i.test(value);
 export function matches(password, encoded) {
@@ -17,6 +14,7 @@ export function encodePassword(password) {
   return `${salt}:${scryptSync(password, salt, 64).toString('hex')}`;
 }
 export async function securityState() {
+  if (!OWNER_HANDOFF_ACTIVE) return null;
   const { query } = await database();
   const [row] = await query("SELECT * FROM owner_security WHERE id='owner'");
   if (!row || !validHash(row.password_hash) || !Number.isSafeInteger(Number(row.epoch)) || Number(row.epoch) < 1 ||
@@ -50,6 +48,7 @@ async function limited(req, scope) {
   return Number(row.count)>8;
 }
 export function registerOwnerHandoff(app, isAdmin) {
+  if (!OWNER_HANDOFF_ACTIVE) return;
   app.get('/api/owner-handoff', async(req,res,next)=>{
     try {
       if (!(await enabled())) return res.json({enabled:false,configured:false,complete:false,mayIssue:false});

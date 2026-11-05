@@ -1,4 +1,5 @@
 import { defineConfig } from '@playwright/test';
+const systemChromium = process.env.BOOKING_SYSTEM_CHROMIUM === '1' ? { launchOptions: { executablePath: '/usr/bin/chromium' } } : {};
 export default defineConfig({
   testDir: './tests/browser',
   workers: 1,
@@ -8,8 +9,8 @@ export default defineConfig({
   outputDir: '.qa/browser',
   reporter: [['list'], ['html', { outputFolder: '.qa/report', open: 'never' }]],
   projects: [
-    { name: 'chromium-desktop', use: { browserName: 'chromium', ...(process.env.BOOKING_SYSTEM_CHROME === '1' ? { channel: 'chrome' } : {}), viewport: { width: 1440, height: 960 } } },
-    { name: 'chromium-mobile', use: { browserName: 'chromium', ...(process.env.BOOKING_SYSTEM_CHROME === '1' ? { channel: 'chrome' } : {}), viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
+    { name: 'chromium-desktop', use: { browserName: 'chromium', ...systemChromium, ...(process.env.BOOKING_SYSTEM_CHROME === '1' ? { channel: 'chrome' } : {}), viewport: { width: 1440, height: 960 } } },
+    { name: 'chromium-mobile', use: { browserName: 'chromium', ...systemChromium, ...(process.env.BOOKING_SYSTEM_CHROME === '1' ? { channel: 'chrome' } : {}), viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
     { name: 'webkit-tablet', use: { browserName: 'webkit', viewport: { width: 820, height: 1180 }, isMobile: true, hasTouch: true } },
     { name: 'webkit-mobile', use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true } },
   ],

@@ -2,14 +2,17 @@
 // SQL execution, isolation, durability, or real Neon deployment compatibility.
 // This file starts a clean-environment child. No .env or real credentials are read.
 import test from 'node:test';
+import {createActiveOwnerSource} from './helpers/active-owner-source.mjs';
+import path from 'node:path';
 import assert from 'node:assert/strict';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 const childFlag='--synthetic-neon-transport-child';
 if (!process.argv.includes(childFlag)) {
-  test('real Neon client with network-free synthetic transport (not PostgreSQL integration)',async()=>{
-    const {stdout}=await promisify(execFile)(process.execPath,[fileURLToPath(import.meta.url),childFlag],{env:{},timeout:30000});
+  test('real Neon client with network-free synthetic transport (not PostgreSQL integration)',async t=>{
+    const source=await createActiveOwnerSource(t);
+    const {stdout}=await promisify(execFile)(process.execPath,[path.join(source.root,'tests/owner-handoff-neon-transport.test.mjs'),childFlag],{env:{},timeout:30000});
     assert.match(stdout,/fail 0/);
   });
 } else {
@@ -122,53 +125,25 @@ if (!process.argv.includes(childFlag)) {
     assert.ok(!JSON.stringify(body).includes('INVALID_TRANSACTION_ACKNOWLEDGEMENT'));
   });
 
-  test('inactive legacy mode accepts empty lock result for content, media and marketing without activating owner state',async()=>{
-    delete process.env.OWNER_HANDOFF_REQUIRED;
+  test('active mode rejects legacy transport mutations with empty state for every env flag',async()=>{
     const {enabled,temporaryAllowed,securityState}=await import('../server/owner-handoff.mjs');
-    const start=calls.length;
-    const emptyLock=result('id',[],25);
-    // This is a synthetic empty-state transport fixture, not a SQL engine.
-    const contents=new Map([['main',{body:'{}',version:1}]]),media=new Map();
     respond=async body=>{
-      if(!body.queries){
-        assert.ok(["SELECT id FROM owner_security WHERE id='owner'","SELECT * FROM owner_security WHERE id='owner'",'SELECT id FROM owner_sessions'].includes(body.query));
-        return {ok:true,json:async()=>result('id',[],25)};
-      }
-      assert.equal(body.queries.length,2);
-      assert.equal(body.queries[0].query,"SELECT id FROM owner_security WHERE id='owner' FOR UPDATE");
-      const {query:sql,params}=body.queries[1];
-      assert.match(sql,/NOT EXISTS \(SELECT 1 FROM owner_security WHERE id='owner'\)/);
-      let acknowledged;
-      if(sql.startsWith('UPDATE content ')){
-        assert.equal(contents.get(params[1]).version,Number(params[2]));
-        contents.set(params[1],{body:params[0],version:2});acknowledged=result('version',[['2']]);
-      }else if(sql.startsWith('INSERT INTO media ')){
-        media.set(params[0],params.slice(1));acknowledged=result('id',[[params[0]]],25);
-      }else{
-        assert.ok(sql.startsWith('INSERT INTO content '));
-        contents.set(params[0],{body:params[1],version:1});acknowledged=result('id',[[params[0]]],25);
-      }
-      return {ok:true,json:async()=>({results:[emptyLock,acknowledged]})};
+      if(!body.queries)return {ok:true,json:async()=>result('id',[],25)};
+      assert.match(body.queries[1].query,/1=0/);
+      return {ok:true,json:async()=>({results:[result('id',[],25),result('id',[],25)]})};
     };
-    try{
-      const status=async()=>({enabled:await enabled(),temporaryAllowed:await temporaryAllowed(),state:await securityState(),sessions:await query('SELECT id FROM owner_sessions')});
-      const before=await status();assert.deepEqual(before,{enabled:false,temporaryAllowed:true,state:null,sessions:[]});
-      for(const [sql,args,expected] of [
-        [update,['{"synthetic":"legacy"}','main',1],[{version:2}]],
-        ['INSERT INTO media (id,mime,body,name) VALUES ($1,$2,$3,$4)',['legacy-media','image/png','synthetic','Synthetic'],[{id:'legacy-media'}]],
-        ['INSERT INTO content (id,body,version) VALUES ($1,$2,1) ON CONFLICT (id) DO NOTHING',['marketing','{"synthetic":"legacy-marketing"}'],[{id:'marketing'}]],
+    for(const flag of [undefined,'0','1']){
+      if(flag===undefined)delete process.env.OWNER_HANDOFF_REQUIRED;else process.env.OWNER_HANDOFF_REQUIRED=flag;
+      assert.equal(await enabled(),true);assert.equal(await temporaryAllowed(),false);assert.equal(await securityState(),null);
+      for(const [sql,args] of [
+        [update,['{}','main',1]],
+        ['INSERT INTO media (id,mime,body,name) VALUES ($1,$2,$3,$4)',['legacy-media','image/png','synthetic','Synthetic']],
+        ['INSERT INTO content (id,body,version) VALUES ($1,$2,1) ON CONFLICT (id) DO NOTHING',['marketing','{}']],
       ]){
-        const offset=calls.length;
-        assert.deepEqual(await accessContext.run({legacy:true},()=>query(sql,args)),expected);
-        takeBatch(offset);
+        const before=calls.length;
+        assert.deepEqual(await accessContext.run({legacy:true},()=>query(sql,args)),[]);
+        takeBatch(before);
       }
-      assert.deepEqual(await status(),before,'inactive access status remains unchanged');
-      assert.deepEqual([...contents],[['main',{body:'{"synthetic":"legacy"}',version:2}],['marketing',{body:'{"synthetic":"legacy-marketing"}',version:1}]]);
-      assert.deepEqual([...media],[['legacy-media',['image/png','synthetic','Synthetic']]]);
-      const statements=calls.slice(start).flatMap(call=>call.body.queries??[call.body]).map(q=>q.query);
-      assert.ok(statements.every(sql=>!/(?:INSERT INTO|UPDATE|DELETE FROM) owner_(?:security|sessions)\b/.test(sql)),'no owner state or session mutation sent');
-      assert.equal(process.env.OWNER_HANDOFF_REQUIRED,undefined);
-    }finally{process.env.OWNER_HANDOFF_REQUIRED='1';}
+    }
   });
-
 }

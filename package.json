@@ -11,13 +11,14 @@
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "start": "node server/start.mjs",
     "setup": "node scripts/setup.mjs",
-    "test": "node --test tests/api.test.mjs tests/assets.test.mjs tests/admin-save.test.mjs tests/admin-password-hash.test.mjs tests/booking-client.test.mjs tests/booking-preparation.test.mjs tests/booking-availability.test.mjs tests/contact-state.test.mjs tests/public-pages.test.mjs tests/temporary-content-access.test.mjs tests/booking-busy.test.mjs tests/anonymous-booking-store.test.mjs tests/private-booking-state.test.mjs tests/booking-occupancy-api.test.mjs tests/booking-ics.test.mjs tests/shifter-preview.test.mjs tests/private-booking-postgres.test.mjs tests/marketing.test.mjs tests/marketing-validation.test.mjs tests/marketing-workspace.test.mjs tests/marketing-topics.test.mjs tests/owner-handoff.test.mjs tests/owner-handoff-postgres.test.mjs tests/owner-handoff-init.test.mjs tests/owner-handoff-neon-transport.test.mjs",
+    "test": "node --test tests/api.test.mjs tests/assets.test.mjs tests/admin-save.test.mjs tests/admin-password-hash.test.mjs tests/booking-client.test.mjs tests/booking-preparation.test.mjs tests/booking-availability.test.mjs tests/contact-state.test.mjs tests/public-pages.test.mjs tests/temporary-content-access.test.mjs tests/booking-busy.test.mjs tests/anonymous-booking-store.test.mjs tests/private-booking-state.test.mjs tests/booking-occupancy-api.test.mjs tests/booking-ics.test.mjs tests/shifter-preview.test.mjs tests/private-booking-postgres.test.mjs tests/marketing.test.mjs tests/marketing-validation.test.mjs tests/marketing-workspace.test.mjs tests/marketing-topics.test.mjs tests/owner-handoff.test.mjs tests/owner-handoff-postgres.test.mjs tests/owner-handoff-init.test.mjs tests/owner-handoff-neon-transport.test.mjs tests/owner-handoff-disabled.test.mjs tests/owner-handoff-disabled-neon.test.mjs",
     "test:owner-handoff-neon-transport": "node --test tests/owner-handoff-neon-transport.test.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "prebuild": "node scripts/restore-media.mjs",
     "predev": "node scripts/restore-media.mjs",
     "test:browser": "playwright test",
-    "pretest": "node scripts/restore-media.mjs"
+    "pretest": "node scripts/restore-media.mjs",
+    "test:owner-handoff-active-browser": "node scripts/test-owner-handoff-active-browser.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "5.2.8",

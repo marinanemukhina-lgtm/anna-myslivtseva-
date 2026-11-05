@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {createActiveOwnerSource} from './helpers/active-owner-source.mjs';
 import assert from 'node:assert/strict';
 import {mkdtemp,rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -7,12 +8,13 @@ import path from 'node:path';
 import {randomBytes} from 'node:crypto';
 
 test('synthetic durable handoff: fail closed, one winner, session revocation and guarded editors', async t=>{
+  const source=await createActiveOwnerSource(t);
   const dir=await mkdtemp(path.join(os.tmpdir(),'anna-handoff-test-'));
   delete process.env.DATABASE_URL; delete process.env.VERCEL;
   process.env.DATA_DIR=dir; process.env.OWNER_HANDOFF_REQUIRED='1';
-  const {createApp}=await import('../server/app.mjs');
-  const {database,accessContext,guardMutation,OWNER_SESSION_INSERT}=await import('../server/db.mjs');
-  const {encodePassword,digest,securityState,temporaryAllowed}=await import('../server/owner-handoff.mjs');
+  const {createApp}=await source.import('server/app.mjs');
+  const {database,accessContext,guardMutation,OWNER_SESSION_INSERT}=await source.import('server/db.mjs');
+  const {encodePassword,digest,securityState,temporaryAllowed,enabled}=await source.import('server/owner-handoff.mjs');
   const oldPassword='synthetic-old-password',newPassword='synthetic-new-password';
   const encoded=encodePassword(oldPassword); process.env.ADMIN_PASSWORD_HASH=encoded;
   const {query}=await database();
@@ -25,6 +27,12 @@ test('synthetic durable handoff: fail closed, one winner, session revocation and
   assert.equal((await login(oldPassword)).status,503);
   assert.deepEqual(await (await req('/api/owner-handoff')).json(),{enabled:true,configured:false,complete:false,mayIssue:false});
   assert.equal(await temporaryAllowed(),false);
+  for(const flag of [undefined,'0','1']){
+    if(flag===undefined)delete process.env.OWNER_HANDOFF_REQUIRED;else process.env.OWNER_HANDOFF_REQUIRED=flag;
+    assert.equal(await enabled(),true);
+    assert.equal(await temporaryAllowed(),false);
+    assert.equal((await login(oldPassword)).status,503,'missing initial state never uses env password');
+  }
   await query("INSERT INTO owner_security (id,password_hash,epoch,complete,temporary_open) VALUES ('owner',$1,1,0,1)",[encoded]);
   const publicReq=async(route,method='GET',body)=>{
     process.env.VERCEL='1';process.env.VERCEL_ENV='production';
@@ -97,4 +105,37 @@ test('synthetic durable handoff: fail closed, one winner, session revocation and
   assert.equal(await securityState(),null);assert.equal(await temporaryAllowed(),false);
   assert.equal((await req('/api/admin/content')).status,401);
   assert.equal((await login(newPassword)).status,503);
+  // A genuine legacy-session row and its cookie must never become a fallback.
+  const legacyToken=randomBytes(32).toString('hex');
+  await query('INSERT INTO sessions (id,expires) VALUES ($1,$2)',[digest(legacyToken),Date.now()+600000]);
+  const legacyCookie='anna_admin='+legacyToken;
+  async function closed(label){
+    for(const flag of [undefined,'0','1']){
+      if(flag===undefined)delete process.env.OWNER_HANDOFF_REQUIRED;else process.env.OWNER_HANDOFF_REQUIRED=flag;
+      assert.equal(await enabled(),true,label);
+      assert.equal(await temporaryAllowed(),false,label);
+      assert.equal((await login(oldPassword)).status,503,label+' old password');
+      assert.equal((await login(newPassword)).status,503,label+' new password');
+      for(const route of ['/api/admin/content','/api/admin/booking']){
+        const legacyResponse=await req(route,'GET',undefined,{cookie:legacyCookie});
+        assert.ok([401,503].includes(legacyResponse.status),label+' legacy cookie');
+        const temporaryResponse=await publicReq(route);
+        assert.ok([401,503].includes(temporaryResponse.status),label+' temporary editor');
+      }
+      const guarded=guardMutation(update,['{}','main',1],{legacy:true});
+      assert.match(guarded.statement,/1=0/,label);
+    }
+  }
+  await closed('corrupt invitation state');
+  await query("UPDATE owner_security SET invitation_expires=NULL,password_hash='invalid' WHERE id='owner'");
+  await closed('corrupt password hash');
+  await query("UPDATE owner_security SET password_hash=$1,epoch=0 WHERE id='owner'",[encoded]);
+  await closed('invalid epoch');
+  await query("DELETE FROM owner_security WHERE id='owner'");
+  await closed('deleted owner row');
+  await query('DROP TABLE owner_security');
+  await closed('missing owner schema');
+  await query('CREATE TABLE owner_security (id TEXT PRIMARY KEY)');
+  await query("INSERT INTO owner_security (id) VALUES ('owner')");
+  await closed('incompatible owner schema');
 });

@@ -1,4 +1,5 @@
 import React, { lazy, Suspense } from "react";
+import { OWNER_HANDOFF_ACTIVE } from "../shared/owner-handoff-mode.mjs";
 import { createRoot } from "react-dom/client";
 import "@fontsource/cormorant-garamond/cyrillic-500.css";
 import "@fontsource/cormorant-garamond/latin-500.css";
@@ -9,8 +10,8 @@ import "@fontsource/inter/latin-500.css";
 import App from "./App.jsx";
 const path = window.location.pathname.replace(/\/$/, "");
 const setup = path === "/admin/setup";
-const claim = path === "/admin/claim";
-const OwnerClaim = lazy(() => import("./OwnerClaim.jsx"));
+const claim = OWNER_HANDOFF_ACTIVE && path === "/admin/claim";
+const OwnerClaim = OWNER_HANDOFF_ACTIVE ? lazy(() => import("./OwnerClaim.jsx")) : null;
 const AdminSetup = lazy(() => import("./AdminSetup.jsx"));
 if (claim) {
   document.documentElement.lang = "ru";

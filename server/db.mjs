@@ -1,5 +1,6 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
+import { OWNER_HANDOFF_ACTIVE } from '../shared/owner-handoff-mode.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
 export const accessContext = new AsyncLocalStorage();
 
@@ -53,8 +54,10 @@ async function init() {
       } catch(e) { db.exec('ROLLBACK'); throw e; }
     };
   }
-  await query(OWNER_SECURITY_DDL);
-  await query(OWNER_SESSIONS_DDL);
+  if (OWNER_HANDOFF_ACTIVE) {
+    await query(OWNER_SECURITY_DDL);
+    await query(OWNER_SESSIONS_DDL);
+  }
   await query(
     "CREATE TABLE IF NOT EXISTS content (id TEXT PRIMARY KEY, body TEXT NOT NULL, version INTEGER NOT NULL)",
   );
@@ -71,6 +74,8 @@ async function init() {
     "INSERT INTO content (id,body,version) VALUES ($1,$2,1) ON CONFLICT (id) DO NOTHING",
     ["main", JSON.stringify(initialContent)],
   );
+  // Disabled releases use the exact legacy query adapter, without any guards.
+  if (!OWNER_HANDOFF_ACTIVE) return { query };
   return { query: async (statement,args=[]) => {
     const context=accessContext.getStore();
     // Login is fenced even before a request has an authenticated context.
@@ -92,10 +97,11 @@ export const OWNER_SESSION_INSERT = "INSERT INTO owner_sessions (id,expires,epoc
 // Explicit whitelist: never try to infer arbitrary SQL structure. New request
 // mutation forms must add a reviewed branch and regression test here.
 export function guardMutation(statement,args,context) {
+  if (!OWNER_HANDOFF_ACTIVE) return { statement, args };
   const values=[...args];
   const bind=value=>{ values.push(value); return '$'+values.length; };
   const predicate=context.legacy
-    ? (process.env.OWNER_HANDOFF_REQUIRED === '1' ? '1=0' : "NOT EXISTS (SELECT 1 FROM owner_security WHERE id='owner')")
+    ? '1=0'
     : context.temporary
     ? "EXISTS (SELECT 1 FROM owner_security WHERE id='owner' AND complete=0 AND temporary_open=1 AND epoch="+bind(context.epoch)+")"
     : "EXISTS (SELECT 1 FROM owner_security JOIN owner_sessions ON owner_sessions.epoch=owner_security.epoch WHERE owner_security.id='owner' AND owner_security.epoch="+bind(context.epoch)+" AND owner_sessions.id="+bind(context.sessionId)+" AND owner_sessions.expires>"+bind(Date.now())+")";

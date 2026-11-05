@@ -28,14 +28,24 @@ test("explicit save only, no URL or storage secrets, successful separate login",
     return route.fulfill({ json: { complete: true, loginRequired: true } });
   });
   await open(page);
-  page.on("request", (request) => requests.push(request.url()));
+  page.on("request", (request) => requests.push({ url: request.url(), method: request.method() }));
   await fill(page);
   await page.getByLabel("Повторите пароль", { exact: true }).press("Enter");
   expect(posts).toHaveLength(0);
   await save(page).click();
   await expect(page.getByRole("heading", { name: "Пароль сохранён" })).toBeVisible();
   expect(posts).toEqual([{ invitation, password }]);
-  expect(requests).toEqual(["http://127.0.0.1:4176/api/owner-handoff/redeem"]);
+  // Status and bundled fonts may finish loading after navigation. Only the
+  // explicit redemption may mutate; no request may expose secrets in its URL
+  // or leave the same origin, regardless of load timing.
+  expect(requests.filter(request => !["GET", "HEAD"].includes(request.method))).toEqual([
+    { url: "http://127.0.0.1:4176/api/owner-handoff/redeem", method: "POST" },
+  ]);
+  for (const request of requests) {
+    expect(new URL(request.url).origin).toBe("http://127.0.0.1:4176");
+    expect(request.url).not.toContain(invitation);
+    expect(request.url).not.toContain(password);
+  }
   expect(await page.evaluate(() => window.__claimStorageWrites)).toEqual([]);
   expect(new URL(page.url()).search).toBe("");
   expect(new URL(page.url()).hash).toBe("");

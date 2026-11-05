@@ -1,4 +1,5 @@
 import express from "express";
+import { temporaryContentAccess, contentPayload } from "./temporary-content-access.mjs";
 import { closePublicIntake, registerBookingPreparation } from "./booking.mjs";
 import { defaults as bookingDefaults } from "../shared/booking.mjs";
 import {
@@ -62,6 +63,18 @@ async function requireAdmin(req, res, next) {
     next(e);
   }
 }
+async function requireContentAccess(req, res, next) {
+  try {
+    if (await isAdmin(req)) return next();
+    if (temporaryContentAccess(req)) {
+      req.contentOnlyAccess = true;
+      return next();
+    }
+    return res.status(401).json({ error: "Войдите в панель управления." });
+  } catch (e) {
+    next(e);
+  }
+}
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
@@ -113,6 +126,7 @@ export function createApp() {
     try {
       res.json({
         authenticated: await isAdmin(req),
+        temporaryContentAccess: temporaryContentAccess(req),
         configured:
           !!process.env.ADMIN_PASSWORD_HASH &&
           (!process.env.VERCEL || !!process.env.DATABASE_URL),
@@ -176,14 +190,14 @@ export function createApp() {
       next(e);
     }
   });
-  app.get("/api/admin/content", requireAdmin, async (_req, res, next) => {
+  app.get("/api/admin/content", requireContentAccess, async (req, res, next) => {
     try {
-      res.json(await readContent());
+      res.json(contentPayload(req, await readContent()));
     } catch (e) {
       next(e);
     }
   });
-  app.put("/api/admin/content", requireAdmin, async (req, res, next) => {
+  app.put("/api/admin/content", requireContentAccess, async (req, res, next) => {
     try {
       const parsed = contentSchema.safeParse(req.body?.data);
       const version = req.body?.version;
@@ -206,6 +220,8 @@ export function createApp() {
       // Preserve it even if an older CMS form omits or submits stale settings.
       const currentSchedule = (await readContent()).data.bookingSchedule ?? bookingDefaults();
       const retainedServiceIds = new Set(parsed.data.services.map((service) => service.id));
+      if (req.contentOnlyAccess && currentSchedule.services.some((service) => !retainedServiceIds.has(service.serviceId)))
+        return res.status(409).json({ error: "Эта услуга используется в защищённом расписании. Для её удаления нужен вход с паролем." });
       parsed.data.bookingSchedule = {
         ...currentSchedule,
         // Deleting a CMS service also removes its private duration configuration,
@@ -222,12 +238,12 @@ export function createApp() {
           error:
             "Сайт изменён в другой вкладке. Сохраните текст отдельно и обновите страницу.",
         });
-      res.json({ data: parsed.data, version: Number(rows[0].version) });
+      res.json(contentPayload(req, { data: parsed.data, version: Number(rows[0].version) }));
     } catch (e) {
       next(e);
     }
   });
-  app.post("/api/media", requireAdmin, async (req, res, next) => {
+  app.post("/api/media", requireContentAccess, async (req, res, next) => {
     try {
       const { base64, type, name } = req.body || {};
       if (
@@ -282,7 +298,7 @@ export function createApp() {
         ["services", "news", "offers", "diplomas"].some((k) =>
           data[k].some((x) => x.image === url),
         );
-      if (!used && !(await isAdmin(req))) return res.sendStatus(404);
+      if (!used && !temporaryContentAccess(req) && !(await isAdmin(req))) return res.sendStatus(404);
       const { query } = await database();
       const [row] = await query(
         "SELECT mime,body,name FROM media WHERE id=$1",

@@ -35,6 +35,8 @@ function Field({
   type = "text",
   hint,
   required = false,
+  disabled = false,
+  autoComplete,
 }) {
   return (
     <label className={"admin-field " + (textarea ? "wide" : "")}>
@@ -50,6 +52,8 @@ function Field({
           type={type}
           value={value ?? ""}
           required={required}
+          disabled={disabled}
+          autoComplete={autoComplete}
           onChange={(e) =>
             onChange(
               type === "number" ? Number(e.target.value) : e.target.value,
@@ -139,10 +143,17 @@ function Upload({ value, onChange, pdf = false }) {
 export default function Admin() {
   const { navigate, load } = useSite();
   const editRevision = useRef(0);
+  const sessionRequest = useRef(false);
+  const ownerLoginButton = useRef(null);
+  const ownerLoginForm = useRef(null);
+  const [ownerLoginOpen, setOwnerLoginOpen] = useState(false);
+  const [sessionBusy, setSessionBusy] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const [calendarDirty, setCalendarDirty] = useState(false);
   const [calendarBusy, setCalendarBusy] = useState(false);
   const [contentOnlyAccess, setContentOnlyAccess] = useState(false);
-  const visibleTabs = contentOnlyAccess ? tabs.filter(([key]) => key !== "calendar") : tabs;
+  const [temporaryCalendarAccess, setTemporaryCalendarAccess] = useState(false);
+  const visibleTabs = contentOnlyAccess && !temporaryCalendarAccess ? tabs.filter(([key]) => key !== "calendar") : tabs;
   const [auth, setAuth] = useState(null),
     [configured, setConfigured] = useState(true),
     [password, setPassword] = useState(""),
@@ -163,6 +174,7 @@ export default function Admin() {
       .then(async (r) => {
         setAuth(r.authenticated || r.temporaryContentAccess);
         setContentOnlyAccess(Boolean(r.temporaryContentAccess && !r.authenticated));
+        setTemporaryCalendarAccess(Boolean(r.temporaryCalendarAccess && !r.authenticated));
         setConfigured(r.configured);
         if (r.authenticated || r.temporaryContentAccess) await read();
       })
@@ -180,6 +192,91 @@ export default function Admin() {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, calendarDirty]);
+  useEffect(() => {
+    if (ownerLoginOpen) ownerLoginForm.current?.querySelector("input, button")?.focus();
+  }, [ownerLoginOpen]);
+  const closeOwnerLogin = () => {
+    if (sessionRequest.current) return;
+    setOwnerLoginOpen(false);
+    setPassword("");
+    setLoginError("");
+    ownerLoginButton.current?.focus();
+  };
+  const login = async (e) => {
+    e.preventDefault();
+    if (sessionRequest.current || busy || calendarBusy || !configured) return;
+    if (calendarDirty && !confirm("Войти и загрузить расписание владельца? Несохранённые изменения расписания будут потеряны.")) return;
+    sessionRequest.current = true;
+    setSessionBusy(true);
+    setLoginError("");
+    setError("");
+    try {
+      await api("/api/session", "POST", { password });
+      setPassword("");
+      const session = await api("/api/session");
+      if (!session.authenticated) throw Error("Не удалось подтвердить вход. Попробуйте войти ещё раз.");
+      setConfigured(session.configured);
+      // Keep the editor's draft and version, including edits made during login.
+      // Calendar data is fetched separately, only after password verification.
+      if (!payload) await read();
+      setContentOnlyAccess(false);
+      setTemporaryCalendarAccess(false);
+      setAuth(true);
+      setOwnerLoginOpen(false);
+    } catch (err) {
+      setLoginError(err.message);
+    } finally {
+      sessionRequest.current = false;
+      setSessionBusy(false);
+    }
+  };
+  const logout = async () => {
+    if (sessionRequest.current || busy || calendarBusy) return;
+    if ((dirty || calendarDirty) && !confirm("Есть несохранённые изменения. Выйти без сохранения?")) return;
+    sessionRequest.current = true;
+    setSessionBusy(true);
+    setError("");
+    setLoginError("");
+    // Hide private data as soon as the owner confirms logout, including when
+    // a failed response leaves the server-side session outcome uncertain.
+    setAuth(null);
+    setContentOnlyAccess(false);
+    setTemporaryCalendarAccess(false);
+    setOwnerLoginOpen(false);
+    setPassword("");
+    setPayload(null);
+    setDirty(false);
+    setCalendarDirty(false);
+    setCalendarBusy(false);
+    setTab("profile");
+    setSelected(null);
+    setNotice("");
+    let signedOut = false;
+    try {
+      await api("/api/session", "DELETE");
+      signedOut = true;
+      // Temporary access can change between login and logout. Ask the server.
+      const session = await api("/api/session");
+      setConfigured(session.configured);
+      const canEdit = Boolean(session.authenticated || session.temporaryContentAccess);
+      setContentOnlyAccess(Boolean(session.temporaryContentAccess && !session.authenticated));
+      setTemporaryCalendarAccess(Boolean(session.temporaryCalendarAccess && !session.authenticated));
+      if (canEdit) await read();
+      setAuth(canEdit);
+    } catch (err) {
+      setAuth(false);
+      setContentOnlyAccess(false);
+      setTemporaryCalendarAccess(false);
+      if (signedOut) {
+        setError("Вы вышли. Не удалось проверить доступ к редактору. Обновите страницу.");
+      } else {
+        setError("Не удалось подтвердить выход. Обновите страницу и проверьте сеанс.");
+      }
+    } finally {
+      sessionRequest.current = false;
+      setSessionBusy(false);
+    }
+  };
   const change = (mutate) => {
     editRevision.current += 1;
     setPayload((p) => {
@@ -205,7 +302,7 @@ export default function Admin() {
     });
   const save = async (e) => {
     e?.preventDefault();
-    if (busy) return;
+    if (busy || sessionRequest.current) return;
     const submitted = payload;
     const submittedRevision = editRevision.current;
     setBusy(true);
@@ -265,23 +362,7 @@ export default function Admin() {
         >
           Анна Мысливцева
         </a>
-        <form
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setError("");
-            setBusy(true);
-            try {
-              await api("/api/session", "POST", { password });
-              setPassword("");
-              await read();
-              setAuth(true);
-            } catch (err) {
-              setError(err.message);
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
+        <form onSubmit={login}>
           <span className="eyebrow">Панель управления</span>
           <h1>Вход.</h1>
           {configured ? (
@@ -292,9 +373,11 @@ export default function Admin() {
                 value={password}
                 onChange={setPassword}
                 required
+                disabled={sessionBusy}
+                autoComplete="current-password"
               />
-              <button className="admin-primary" disabled={busy}>
-                {busy ? "Входим…" : "Войти"}
+              <button className="admin-primary" disabled={sessionBusy}>
+                {sessionBusy ? "Входим…" : "Войти"}
               </button>
             </>
           ) : (
@@ -302,9 +385,9 @@ export default function Admin() {
               Доступ ещё не настроен. <a href="/admin/setup">Подготовьте пароль</a> и сохраните его хеш в настройках проекта Vercel.
             </p>
           )}
-          {error && (
+          {(loginError || error) && (
             <p role="alert" className="admin-error">
-              {error}
+              {loginError || error}
             </p>
           )}
         </form>
@@ -324,7 +407,7 @@ export default function Admin() {
           {visibleTabs.map(([key, label]) => (
             <button
               key={key}
-              disabled={calendarBusy}
+              disabled={calendarBusy || sessionBusy}
               className={tab === key ? "active" : ""}
               onClick={() => {
                 if (calendarDirty && key !== tab && !confirm("Есть несохранённое расписание. Перейти без сохранения?")) return;
@@ -341,33 +424,74 @@ export default function Admin() {
           ))}
         </nav>
         <div className="admin-sidebar-bottom">
+          {!contentOnlyAccess && <a href="/admin/marketing">Маркетинг и прогрев</a>}
           <a href="/" target="_blank" rel="noreferrer">
             Открыть сайт
           </a>
-          {!contentOnlyAccess && <button
-            disabled={calendarBusy}
-            onClick={async () => {
-              if (
-                (dirty || calendarDirty) &&
-                !confirm("Есть несохранённые изменения. Выйти без сохранения?")
-              )
-                return;
-              await api("/api/session", "DELETE");
-              setAuth(false);
-              setPayload(null);
-              setDirty(false);
+          {contentOnlyAccess ? <button
+            type="button"
+            ref={ownerLoginButton}
+            aria-expanded={ownerLoginOpen}
+            aria-controls="owner-login"
+            disabled={busy || calendarBusy || sessionBusy || !payload}
+            onClick={() => {
+              setOwnerLoginOpen(true);
+              setLoginError("");
             }}
           >
-            Выйти
+            Вход владельца
+          </button> : <button
+            disabled={busy || calendarBusy || sessionBusy}
+            onClick={logout}
+          >
+            {sessionBusy ? "Выходим…" : "Выйти"}
           </button>}
         </div>
       </aside>
       <main className="admin-main">
         {contentOnlyAccess && <div role="status" className="admin-alert admin-error">
           Временный открытый доступ: любой посетитель может менять материалы сайта.
-          Не добавляйте конфиденциальные сведения. Календарь и запись остаются закрытыми.
+          Не добавляйте конфиденциальные сведения. {temporaryCalendarAccess ? "Рабочие часы тоже доступны всем для изменения. Занятость и проверка свободного времени доступны только владельцу по паролю. Онлайн-запись закрыта." : "Календарь и запись остаются закрытыми."}
           Чтобы вернуть защиту, владелец должен отключить временный доступ и повторно развернуть сайт.
         </div>}
+        {contentOnlyAccess && ownerLoginOpen && <form
+          id="owner-login"
+          ref={ownerLoginForm}
+          className="admin-card"
+          aria-labelledby="owner-login-title"
+          onSubmit={login}
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              e.preventDefault();
+              closeOwnerLogin();
+            }
+          }}
+        >
+          <h2 id="owner-login-title">Вход владельца</h2>
+          {configured ? <>
+            <p>Введите существующий пароль владельца. Занятость и проверка свободного времени откроются только после проверки пароля. Правки материалов останутся в редакторе.</p>
+            <Field
+              label="Пароль"
+              type="password"
+              value={password}
+              onChange={setPassword}
+              required
+              disabled={sessionBusy}
+              autoComplete="current-password"
+            />
+          </> : <p>
+            Защищённый вход ещё не настроен. Занятость и проверка свободного времени недоступны. После настройки пароля и подключения хранилища обновите страницу.
+          </p>}
+          {loginError && <p role="alert" className="admin-error">{loginError}</p>}
+          <div className="editor-actions">
+            {configured && <button className="admin-primary" disabled={sessionBusy || busy}>
+              {sessionBusy ? "Входим…" : "Войти"}
+            </button>}
+            <button type="button" className="text-button" disabled={sessionBusy} onClick={closeOwnerLogin}>
+              Отмена
+            </button>
+          </div>
+        </form>}
         <header className="admin-topbar">
           <div>
             <span className="eyebrow">
@@ -380,7 +504,7 @@ export default function Admin() {
           {tab !== "calendar" && <button
             className="admin-primary"
             onClick={save}
-            disabled={busy || !dirty || !payload}
+            disabled={busy || sessionBusy || !dirty || !payload}
           >
             {busy ? "Сохраняем…" : "Сохранить изменения"}
           </button>}
@@ -398,7 +522,7 @@ export default function Admin() {
         {!payload ? (
           <p>Загрузка…</p>
         ) : tab === "calendar" ? (
-          <AdminCalendar services={payload.data.services} onDirtyChange={setCalendarDirty} onBusyChange={setCalendarBusy} onUnauthenticated={() => setAuth(false)} onSaved={(previousVersion, saved) => setPayload(current => mergeScheduleSave(current, previousVersion, saved))} />
+          <AdminCalendar key={temporaryCalendarAccess ? "temporary" : "owner"} temporaryCalendarAccess={temporaryCalendarAccess} services={payload.data.services} onDirtyChange={setCalendarDirty} onBusyChange={setCalendarBusy} onUnauthenticated={() => setAuth(false)} onSaved={(previousVersion, saved) => setPayload(current => mergeScheduleSave(current, previousVersion, saved))} />
         ) : tab === "profile" ? (
           <form className="profile-form" onSubmit={save}>
             <section className="admin-card">

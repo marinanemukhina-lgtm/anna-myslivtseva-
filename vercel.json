@@ -39,5 +39,10 @@
       "src": "/(.*)",
       "dest": "/api"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "prep/anonymous-busy-windows-20261105": false
+    }
+  }
 }

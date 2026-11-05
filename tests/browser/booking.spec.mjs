@@ -2,7 +2,7 @@ import { test as base, expect } from '@playwright/test';
 
 const freshSettings = () => ({ timezone: '', services: [], weeklyHours: { 0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] }, overrides: [], slotStepMinutes: 15, minNoticeMinutes: 0, horizonDays: 60 });
 const tomorrow = () => new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-const service = { id: 'browser-schedule-fixture', title: 'Синтетическая услуга QA', body: '', image: '', published: false, price: '', duration: '', category: '' };
+const service = { id: 'browser-schedule-fixture', title: 'Синтетическая услуга QA', body: '', image: '', published: true, price: '', duration: '', category: '' };
 const test = base.extend({
   prepared: async ({ page, baseURL }, use) => {
     await page.goto('/admin');
@@ -17,6 +17,8 @@ const test = base.extend({
     expect((await put('/api/admin/content', next)).ok()).toBe(true);
     let current = await get('/api/admin/booking');
     expect((await put('/api/admin/booking', { version: current.version, settings: freshSettings() })).ok()).toBe(true);
+    current = await get('/api/admin/booking');
+    expect((await put('/api/admin/booking/coverage', { expectedVersion: current.version, start: new Date(Date.now()-86400000).toISOString(), end: new Date(Date.now()+65*86400000).toISOString(), verifiedUntil: new Date(Date.now()+23*3600000).toISOString() })).ok()).toBe(true);
     await page.reload();
     try { await use({ get, put }); }
     finally {

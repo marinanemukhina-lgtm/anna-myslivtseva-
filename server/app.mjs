@@ -1,6 +1,8 @@
 import express from "express";
+import { registerMarketing } from "./marketing.mjs";
+import { registerPrivateBooking } from "./booking-occupancy.mjs";
 import { registerPublicPages } from "./public-pages.mjs";
-import { temporaryContentAccess, contentPayload } from "./temporary-content-access.mjs";
+import { temporaryContentAccess, temporaryCalendarAccess, contentPayload } from "./temporary-content-access.mjs";
 import { closePublicIntake, registerBookingPreparation } from "./booking.mjs";
 import { defaults as bookingDefaults } from "../shared/booking.mjs";
 import {
@@ -76,6 +78,18 @@ async function requireContentAccess(req, res, next) {
     next(e);
   }
 }
+async function requireCalendarAccess(req, res, next) {
+  try {
+    if (await isAdmin(req)) return next();
+    if (temporaryCalendarAccess(req)) {
+      req.temporaryCalendarAccess = true;
+      return next();
+    }
+    return res.status(401).json({ error: "Войдите в панель управления." });
+  } catch (e) {
+    next(e);
+  }
+}
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
@@ -128,6 +142,7 @@ export function createApp() {
       res.json({
         authenticated: await isAdmin(req),
         temporaryContentAccess: temporaryContentAccess(req),
+        temporaryCalendarAccess: temporaryCalendarAccess(req),
         configured:
           !!process.env.ADMIN_PASSWORD_HASH &&
           (!process.env.VERCEL || !!process.env.DATABASE_URL),
@@ -219,7 +234,16 @@ export function createApp() {
             .json({ error: "У опубликованной записи должен быть заголовок." });
       // Only the dedicated schedule endpoint may change bookingSchedule.
       // Preserve it even if an older CMS form omits or submits stale settings.
-      const currentSchedule = (await readContent()).data.bookingSchedule ?? bookingDefaults();
+      const currentContent = await readContent();
+      // Bind the preserved private fields to the exact version we will CAS.
+      // A guessed future client version must not overwrite a later booking write.
+      if (currentContent.version !== version)
+        return res.status(409).json({ error: "Сайт изменён. Обновите данные перед сохранением." });
+      const currentPrivateData = currentContent.data;
+      const currentSchedule = currentPrivateData.bookingSchedule ?? bookingDefaults();
+      // Private occupancy can only change through authenticated booking handlers.
+      if (currentPrivateData.bookingOccupancy !== undefined)
+        parsed.data.bookingOccupancy = currentPrivateData.bookingOccupancy;
       const retainedServiceIds = new Set(parsed.data.services.map((service) => service.id));
       if (req.contentOnlyAccess && currentSchedule.services.some((service) => !retainedServiceIds.has(service.serviceId)))
         return res.status(409).json({ error: "Эта услуга используется в защищённом расписании. Для её удаления нужен вход с паролем." });
@@ -314,14 +338,17 @@ export function createApp() {
       next(e);
     }
   });
-  registerBookingPreparation(app, requireAdmin);
+  registerBookingPreparation(app, requireAdmin, requireCalendarAccess);
+  registerMarketing(app, requireAdmin);
+  registerPrivateBooking(app, requireAdmin);
   registerPublicPages(app);
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "Страница не найдена." }),
   );
   app.use((e, _req, res, _next) => {
     const tooLarge = e.type === "entity.too.large";
-    console.error("API:", e.message);
+    // Parser and database exception messages can contain submitted private text.
+    console.error("API:", tooLarge ? "REQUEST_TOO_LARGE" : e.type === "entity.parse.failed" ? "INVALID_JSON" : "INTERNAL_ERROR");
     res
       .status(tooLarge ? 413 : e.type === "entity.parse.failed" ? 400 : 503)
       .json({

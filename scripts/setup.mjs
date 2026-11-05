@@ -1,3 +1,10 @@
+import 'dotenv/config';
+import { enabled as ownerHandoffEnabled } from '../server/owner-handoff.mjs';
+// Durable state is authoritative, even if its opt-in flag was later removed.
+if (await ownerHandoffEnabled()) {
+  console.error('Owner handoff is enabled or already initialized. Legacy setup cannot reset this password. Recovery requires a separately approved procedure that rotates the session epoch, revokes invitations and keeps temporary access closed. Do not delete owner state or restore legacy authentication.');
+  process.exit(1);
+}
 import { scryptSync, randomBytes } from "node:crypto";
 import { writeFile, readFile } from "node:fs/promises";
 import readline from "node:readline";

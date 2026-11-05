@@ -42,7 +42,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "prep/anonymous-busy-windows-20261105": false
+      "prep/anonymous-busy-windows-20261105": false,
+      "prep/owner-invitation-20261105": false
     }
   }
 }

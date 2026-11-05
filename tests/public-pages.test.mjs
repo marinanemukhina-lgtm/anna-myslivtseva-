@@ -34,3 +34,11 @@ test('trailing-slash normalization never redirects to another origin', async () 
   assert.equal(result.status,308); assert.equal(result.location,'/example.com');
  } finally { await new Promise(resolve => server.close(resolve)); }
 });
+
+test('owner claim is a noindex application route without public metadata',()=>{
+ const page=renderPublicPage(template,'/admin/claim',initialContent);
+ assert.equal(page.status,200);
+ assert.equal(page.noindex,true);
+ assert.match(page.html,/noindex, nofollow/);
+ assert.doesNotMatch(page.html,/rel="canonical"/);
+});

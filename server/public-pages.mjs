@@ -9,7 +9,7 @@ export function renderPublicPage(template, pathname, raw) {
   const parts = pathname.split('/').filter(Boolean);
   const collection = ['news','offers'].includes(parts[0]) ? data[parts[0]] : null;
   const article = collection && parts.length === 2 ? collection.find(x => x.id === parts[1]) : null;
-  const admin = ['/admin','/admin/setup'].includes(pathname);
+  const admin = ['/admin','/admin/setup','/admin/claim'].includes(pathname);
   const known = Object.hasOwn(titles, pathname) || !!article || admin;
   const status = known ? 200 : 404;
   const title = article?.title || titles[pathname] || (admin ? 'Вход' : 'Страница не найдена');

@@ -1,0 +1,4 @@
+.owner-claim, .owner-claim * { box-sizing: border-box; }
+.owner-claim .admin-setup-fields > .admin-setup-small { margin: -14px 0 0; }
+.owner-claim .owner-claim-login { display: inline-block; margin-top: 12px; text-decoration: none; }
+.owner-claim a:focus-visible, .owner-claim button:focus-visible { outline: 2px solid #1e305e; outline-offset: 4px; }

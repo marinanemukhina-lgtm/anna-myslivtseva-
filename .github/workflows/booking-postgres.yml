@@ -1,10 +1,13 @@
-name: Synthetic booking PostgreSQL checks
+name: Synthetic booking and owner PostgreSQL checks
 
 on:
   pull_request:
     paths:
       - '.github/workflows/booking-postgres.yml'
       - 'tests/private-booking-postgres.test.mjs'
+      - 'tests/owner-handoff-postgres.test.mjs'
+      - 'server/db.mjs'
+      - 'server/owner-handoff.mjs'
       - 'server/private-booking-state.mjs'
       - 'shared/booking.mjs'
       - 'package.json'
@@ -48,9 +51,11 @@ jobs:
           sudo apt-get install --yes --no-install-recommends postgresql-client
       - name: Install locked dependencies without lifecycle scripts
         run: npm ci --ignore-scripts
-      - name: Check real PostgreSQL concurrency and recovery
+      - name: Check real PostgreSQL concurrency, transfer and recovery
         env:
           DATABASE_URL: ''
           BOOKING_POSTGRES_TEST_ALLOW_WRITE: synthetic-only
           BOOKING_POSTGRES_TEST_URL: postgresql://booking_synthetic:booking-synthetic-only@127.0.0.1:55432/booking_synthetic
-        run: node --test tests/private-booking-postgres.test.mjs
+          OWNER_HANDOFF_POSTGRES_TEST_ALLOW_WRITE: synthetic-only
+          OWNER_HANDOFF_POSTGRES_TEST_URL: postgresql://booking_synthetic:booking-synthetic-only@127.0.0.1:55432/booking_synthetic
+        run: node --test tests/private-booking-postgres.test.mjs tests/owner-handoff-postgres.test.mjs

@@ -1,4 +1,6 @@
 import express from "express";
+import { enabled as handoffEnabled, securityState, matches, registerOwnerHandoff, temporaryAllowed } from './owner-handoff.mjs';
+import { accessContext, OWNER_SESSION_INSERT } from './db.mjs';
 import { registerMarketing } from "./marketing.mjs";
 import { registerPrivateBooking } from "./booking-occupancy.mjs";
 import { registerPublicPages } from "./public-pages.mjs";
@@ -52,6 +54,15 @@ async function isAdmin(req) {
   const token = cookie(req);
   if (!/^[a-f0-9]{64}$/.test(token)) return false;
   const { query } = await database();
+  if (await handoffEnabled()) {
+    const state=await securityState();
+    if (!state) return false;
+    const [session]=await query('SELECT expires,epoch FROM owner_sessions WHERE id=$1',[hash(token)]);
+    if (!session || !Number.isSafeInteger(Number(session.expires)) || Number(session.expires)<=Date.now() || Number(session.epoch)!==state.epoch) return false;
+    req.ownerEpoch=state.epoch;
+    req.ownerSessionId=hash(token);
+    return true;
+  }
   const [s] = await query("SELECT expires FROM sessions WHERE id=$1", [
     hash(token),
   ]);
@@ -61,17 +72,18 @@ async function requireAdmin(req, res, next) {
   try {
     if (!(await isAdmin(req)))
       return res.status(401).json({ error: "Войдите в панель управления." });
-    next();
+    accessContext.run(req.ownerEpoch ? {epoch:req.ownerEpoch,sessionId:req.ownerSessionId}:{legacy:true},next);
   } catch (e) {
     next(e);
   }
 }
 async function requireContentAccess(req, res, next) {
   try {
-    if (await isAdmin(req)) return next();
-    if (temporaryContentAccess(req)) {
+    if (await isAdmin(req)) return accessContext.run(req.ownerEpoch ? {epoch:req.ownerEpoch,sessionId:req.ownerSessionId}:{legacy:true},next);
+    if (temporaryContentAccess(req) && await temporaryAllowed()) {
       req.contentOnlyAccess = true;
-      return next();
+      const state=await securityState();
+      return accessContext.run(state ? {temporary:true,epoch:state.epoch}:{legacy:true},next);
     }
     return res.status(401).json({ error: "Войдите в панель управления." });
   } catch (e) {
@@ -80,10 +92,11 @@ async function requireContentAccess(req, res, next) {
 }
 async function requireCalendarAccess(req, res, next) {
   try {
-    if (await isAdmin(req)) return next();
-    if (temporaryCalendarAccess(req)) {
+    if (await isAdmin(req)) return accessContext.run(req.ownerEpoch ? {epoch:req.ownerEpoch,sessionId:req.ownerSessionId}:{legacy:true},next);
+    if (temporaryCalendarAccess(req) && await temporaryAllowed()) {
       req.temporaryCalendarAccess = true;
-      return next();
+      const state=await securityState();
+      return accessContext.run(state ? {temporary:true,epoch:state.epoch}:{legacy:true},next);
     }
     return res.status(401).json({ error: "Войдите в панель управления." });
   } catch (e) {
@@ -141,10 +154,10 @@ export function createApp() {
     try {
       res.json({
         authenticated: await isAdmin(req),
-        temporaryContentAccess: temporaryContentAccess(req),
-        temporaryCalendarAccess: temporaryCalendarAccess(req),
+        temporaryContentAccess: temporaryContentAccess(req) && await temporaryAllowed(),
+        temporaryCalendarAccess: temporaryCalendarAccess(req) && await temporaryAllowed(),
         configured:
-          !!process.env.ADMIN_PASSWORD_HASH &&
+          (await handoffEnabled() ? !!(await securityState()) : !!process.env.ADMIN_PASSWORD_HASH) &&
           (!process.env.VERCEL || !!process.env.DATABASE_URL),
       });
     } catch (e) {
@@ -155,7 +168,8 @@ export function createApp() {
   });
   app.post("/api/session", async (req, res, next) => {
     try {
-      if (!process.env.ADMIN_PASSWORD_HASH)
+      const durable=await handoffEnabled(), state=durable ? await securityState() : null;
+      if (durable ? !state : !process.env.ADMIN_PASSWORD_HASH)
         return res
           .status(503)
           .json({ error: "Пароль администратора ещё не настроен." });
@@ -170,15 +184,15 @@ export function createApp() {
         return res
           .status(429)
           .json({ error: "Слишком много попыток. Повторите через 15 минут." });
-      if (!passwordMatches(req.body?.password))
+      if (!(durable ? matches(req.body?.password,state.password_hash) : passwordMatches(req.body?.password)))
         return res.status(401).json({ error: "Неверный пароль." });
       await query("DELETE FROM attempts WHERE id=$1", [key]);
       await query("DELETE FROM sessions WHERE expires<$1", [now]);
       const token = randomBytes(32).toString("hex");
-      await query("INSERT INTO sessions (id,expires) VALUES ($1,$2)", [
-        hash(token),
-        now + 8 * 3600000,
-      ]);
+      if (durable) {
+        const rows=await query(OWNER_SESSION_INSERT,[hash(token),now+8*3600000,state.epoch,state.password_hash]);
+        if (!rows.length) return res.status(401).json({error:'Войдите снова.'});
+      } else await query("INSERT INTO sessions (id,expires) VALUES ($1,$2)",[hash(token),now+8*3600000]);
       res.cookie(cookieName, token, {
         httpOnly: true,
         sameSite: "strict",
@@ -195,6 +209,7 @@ export function createApp() {
     try {
       const { query } = await database();
       await query("DELETE FROM sessions WHERE id=$1", [hash(cookie(req))]);
+      await query("DELETE FROM owner_sessions WHERE id=$1", [hash(cookie(req))]);
       res.clearCookie(cookieName, {
         path: "/",
         httpOnly: true,
@@ -206,6 +221,7 @@ export function createApp() {
       next(e);
     }
   });
+  registerOwnerHandoff(app,isAdmin);
   app.get("/api/admin/content", requireContentAccess, async (req, res, next) => {
     try {
       res.json(contentPayload(req, await readContent()));
@@ -304,10 +320,11 @@ export function createApp() {
           .status(409)
           .json({ error: "Достигнут лимит медиатеки (500 файлов)." });
       const id = randomUUID();
-      await query(
+      const inserted=await query(
         "INSERT INTO media (id,mime,body,name) VALUES ($1,$2,$3,$4)",
         [id, type, base64, String(name || "Файл").slice(0, 200)],
       );
+      if (Array.isArray(inserted) && !inserted.length) return res.status(409).json({error:'Доступ изменился. Войдите снова.'});
       res.status(201).json({ url: "/api/media/" + id, type, name });
     } catch (e) {
       next(e);
@@ -323,7 +340,7 @@ export function createApp() {
         ["services", "news", "offers", "diplomas"].some((k) =>
           data[k].some((x) => x.image === url),
         );
-      if (!used && !temporaryContentAccess(req) && !(await isAdmin(req))) return res.sendStatus(404);
+      if (!used && !(temporaryContentAccess(req) && await temporaryAllowed()) && !(await isAdmin(req))) return res.sendStatus(404);
       const { query } = await database();
       const [row] = await query(
         "SELECT mime,body,name FROM media WHERE id=$1",

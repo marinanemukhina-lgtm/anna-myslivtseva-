@@ -141,6 +141,8 @@ export default function Admin() {
   const editRevision = useRef(0);
   const [calendarDirty, setCalendarDirty] = useState(false);
   const [calendarBusy, setCalendarBusy] = useState(false);
+  const [contentOnlyAccess, setContentOnlyAccess] = useState(false);
+  const visibleTabs = contentOnlyAccess ? tabs.filter(([key]) => key !== "calendar") : tabs;
   const [auth, setAuth] = useState(null),
     [configured, setConfigured] = useState(true),
     [password, setPassword] = useState(""),
@@ -159,9 +161,10 @@ export default function Admin() {
   useEffect(() => {
     api("/api/session")
       .then(async (r) => {
-        setAuth(r.authenticated);
+        setAuth(r.authenticated || r.temporaryContentAccess);
+        setContentOnlyAccess(Boolean(r.temporaryContentAccess && !r.authenticated));
         setConfigured(r.configured);
-        if (r.authenticated) await read();
+        if (r.authenticated || r.temporaryContentAccess) await read();
       })
       .catch((e) => {
         setAuth(false);
@@ -318,7 +321,7 @@ export default function Admin() {
         </a>
         <span className="eyebrow">Управление сайтом</span>
         <nav>
-          {tabs.map(([key, label]) => (
+          {visibleTabs.map(([key, label]) => (
             <button
               key={key}
               disabled={calendarBusy}
@@ -341,7 +344,7 @@ export default function Admin() {
           <a href="/" target="_blank" rel="noreferrer">
             Открыть сайт
           </a>
-          <button
+          {!contentOnlyAccess && <button
             disabled={calendarBusy}
             onClick={async () => {
               if (
@@ -356,10 +359,15 @@ export default function Admin() {
             }}
           >
             Выйти
-          </button>
+          </button>}
         </div>
       </aside>
       <main className="admin-main">
+        {contentOnlyAccess && <div role="status" className="admin-alert admin-error">
+          Временный открытый доступ: любой посетитель может менять материалы сайта.
+          Не добавляйте конфиденциальные сведения. Календарь и запись остаются закрытыми.
+          Чтобы вернуть защиту, владелец должен отключить временный доступ и повторно развернуть сайт.
+        </div>}
         <header className="admin-topbar">
           <div>
             <span className="eyebrow">
@@ -736,8 +744,9 @@ export default function Admin() {
           </div>
         )}
         <div className="admin-footnote">
-          Изменения публикуются после сохранения. Черновики видны только в этой
-          панели.
+          Изменения публикуются после сохранения. {contentOnlyAccess
+            ? "Пока доступ открыт, черновики в панели доступны всем посетителям."
+            : "Черновики видны только в этой панели."}
         </div>
       </main>
     </div>

@@ -17,3 +17,20 @@ test('unknown paths return 404 and administrative pages are noindex',()=>{
  assert.doesNotMatch(renderPublicPage(template,'/admin',initialContent).html,/canonical/);
  assert.match(renderPublicPage(template,'/',initialContent).html,/Анна Мысливцева/);
 });
+
+test('trailing-slash normalization never redirects to another origin', async () => {
+ const {default: express} = await import('express');
+ const {request} = await import('node:http');
+ const {registerPublicPages} = await import('../server/public-pages.mjs');
+ const app = express(); registerPublicPages(app);
+ const server = app.listen(0, '127.0.0.1');
+ await new Promise(resolve => server.once('listening', resolve));
+ try {
+  const result = await new Promise((resolve, reject) => {
+   request({host:'127.0.0.1',port:server.address().port,path:'//example.com/'}, response => {
+    response.resume(); resolve({status:response.statusCode,location:response.headers.location});
+   }).on('error',reject).end();
+  });
+  assert.equal(result.status,308); assert.equal(result.location,'/example.com');
+ } finally { await new Promise(resolve => server.close(resolve)); }
+});

@@ -29,7 +29,7 @@ export function renderPublicPage(template, pathname, raw) {
 export function registerPublicPages(app) {
   app.get('/{*path}', async (req,res,next) => {
     if (/^\/(api|assets|media)(\/|$)/.test(req.path) || /\.[a-z0-9]+$/i.test(req.path)) return next();
-    if (req.path !== '/' && req.path.endsWith('/')) return res.redirect(308, req.path.replace(/\/+$/, '') + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''));
+    if (req.path !== '/' && req.path.endsWith('/')) return res.redirect(308, req.path.replace(/^\/+/, '/').replace(/\/+$/, '') + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''));
     try {
       const template = await readFile(new URL('../dist/client/index.html', import.meta.url),'utf8');
       const raw = process.env.VERCEL && !process.env.DATABASE_URL ? initialContent : (await readContent()).data;

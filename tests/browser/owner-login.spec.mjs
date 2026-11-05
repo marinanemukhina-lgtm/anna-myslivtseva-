@@ -10,7 +10,7 @@ async function temporaryEditor({ page, request, baseURL }, options = {}) {
   // Read the fixture using a separate authenticated API context. The browser
   // remains anonymous. Only temporary content access is simulated below;
   // password POSTs, session verification and protected booking APIs stay real.
-  const headers = { origin: baseURL };
+  const headers = { origin: baseURL, "Content-Type": "application/json" };
   expect((await request.post('/api/session', { headers, data: { password } })).ok()).toBe(true);
   const response = await request.get('/api/admin/content');
   expect(response.ok()).toBe(true);

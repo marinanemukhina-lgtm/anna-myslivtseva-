@@ -11,6 +11,6 @@ export function temporaryContentAccess(req, env = process.env) {
 
 export function contentPayload(req, payload) {
   if (!req.contentOnlyAccess) return payload;
-  const { bookingSchedule, ...data } = payload.data;
+  const { bookingSchedule, bookingOccupancy, ...data } = payload.data;
   return { ...payload, data };
 }

@@ -108,7 +108,7 @@ export const initialContent = {
   diplomas: [],
 };
 export function publicContent(data) {
-  const { bookingSchedule: _privateSchedule, ...visible } = data;
+  const { bookingSchedule: _privateSchedule, bookingOccupancy: _privateOccupancy, ...visible } = data;
   return {
     ...visible,
     services: data.services.filter((x) => x.published),

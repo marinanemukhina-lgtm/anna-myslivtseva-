@@ -1,3 +1,9 @@
+import { OWNER_HANDOFF_ACTIVE } from '../shared/owner-handoff-mode.mjs';
+// Active releases never permit legacy recovery, even without owner state.
+if (OWNER_HANDOFF_ACTIVE) {
+  console.error('This is an active owner handoff release. Legacy setup cannot reset this password. Recovery requires a separately approved procedure that rotates the session epoch, revokes invitations and keeps temporary access closed. Do not delete owner state or restore legacy authentication.');
+  process.exit(1);
+}
 import { scryptSync, randomBytes } from "node:crypto";
 import { writeFile, readFile } from "node:fs/promises";
 import readline from "node:readline";

@@ -34,3 +34,15 @@ test('trailing-slash normalization never redirects to another origin', async () 
   assert.equal(result.status,308); assert.equal(result.location,'/example.com');
  } finally { await new Promise(resolve => server.close(resolve)); }
 });
+
+test('owner claim is absent in disabled and noindex in an isolated active release',async t=>{
+ assert.equal(renderPublicPage(template,'/admin/claim',initialContent).status,404);
+ const {createActiveOwnerSource}=await import('./helpers/active-owner-source.mjs');
+ const active=await createActiveOwnerSource(t);
+ const {renderPublicPage:renderActive}=await active.import('server/public-pages.mjs');
+ const page=renderActive(template,'/admin/claim',initialContent);
+ assert.equal(page.status,200);
+ assert.equal(page.noindex,true);
+ assert.match(page.html,/noindex, nofollow/);
+ assert.doesNotMatch(page.html,/rel="canonical"/);
+});

@@ -43,6 +43,7 @@ export const contentSchema = z.object({
     bookingUrl: link,
     mapUrl: link,
     socialUrl: link,
+    socialLinks: z.object({telegram:link.default(""),max:link.default(""),vk:link.default(""),instagram:link.default(""),whatsapp:link.default("")}).optional(),
     portrait: media,
     heroPosition: z.number().min(0).max(100),
     privacy: text,

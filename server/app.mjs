@@ -339,7 +339,7 @@ export function createApp() {
     }
   });
   registerBookingPreparation(app, requireAdmin, requireCalendarAccess);
-  registerMarketing(app, requireAdmin);
+  registerMarketing(app, requireAdmin, requireContentAccess);
   registerPrivateBooking(app, requireAdmin);
   registerPublicPages(app);
   app.use("/api", (_req, res) =>

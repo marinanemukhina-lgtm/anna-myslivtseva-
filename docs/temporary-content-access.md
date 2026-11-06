@@ -15,3 +15,5 @@ After deployment, a fresh browser must show the password form at `/admin`, `/api
 The existing password configuration is preserved. A new password, if wanted, must be prepared via `/admin/setup`, configured as `ADMIN_PASSWORD_HASH` in the project's Vercel environment, and deployed. The setup page does not install a password by itself. Merely installing a password does not turn off the temporary-access flag.
 
 The existing “Вход владельца” control verifies the password and server session before mounting a fresh owner calendar. Content drafts retain their exact version. Unsaved schedule changes require confirmation before replacement on login; logout reloads the current limited scope. Changing a password alone disables neither opt-in. No real calendar imports or client booking intake are enabled by this change.
+
+Update 2026-11-06: the explicitly open content mode now also covers the marketing workspace, its non-secret materials summary and versioned content saves. It still creates no owner session and does not enable publication or access to private booking endpoints. Marketing GET is read-only; initial persistence requires an explicit PUT.

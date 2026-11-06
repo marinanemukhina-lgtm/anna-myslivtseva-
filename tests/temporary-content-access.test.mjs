@@ -90,7 +90,7 @@ test('open content editor preserves protected schedule and does not create authe
   result.data.services=[];
   assert.equal((await request('/api/admin/content','PUT',result)).status,409);
   assert.deepEqual((await readContent()).data.bookingSchedule,fixture.bookingSchedule);
-  for (const route of ['/admin/marketing','/api/admin/marketing','/api/admin/marketing/seed','/api/admin/marketing/assets/safety','/api/admin/marketing/assets/styles','/api/admin/booking/occupancy','/api/admin/booking/free-availability?serviceId=fixture-service&date=2026-11-06','/api/admin/booking/availability?serviceId=fixture-service&date=2026-11-06']) {
+  for (const route of ['/api/admin/booking/occupancy','/api/admin/booking/free-availability?serviceId=fixture-service&date=2026-11-06','/api/admin/booking/availability?serviceId=fixture-service&date=2026-11-06']) {
     assert.equal((await request(route)).status,401);
   }
   for (const [route,method] of [['coverage','PUT'],['busy','POST'],['reservations','POST'],['records/fixture/cancel','POST'],['import/preview','POST'],['import/apply','POST']]) {
@@ -110,7 +110,23 @@ test('open content editor preserves protected schedule and does not create authe
   assert.equal((await request('/api/admin/booking','PUT',{settings,version:calendar.version+10})).status,409);
   assert.deepEqual((await readContent()).data.bookingOccupancy,fixture.bookingOccupancy);
 
-  assert.equal((await request('/api/admin/marketing','PUT',{})).status,401);
+  assert.equal((await request('/api/admin/marketing','PUT',{})).status,400);
+  for (const route of ['/admin/marketing','/api/admin/marketing','/api/admin/marketing/seed','/api/admin/marketing/materials','/api/admin/marketing/assets/materials','/api/admin/marketing/assets/safety','/api/admin/marketing/assets/styles']) assert.equal((await request(route)).status,200);
+  assert.equal((await query('SELECT id FROM content WHERE id=$1',['marketing'])).length,0,'Opening marketing must not create a database row');
+  const materials=await (await request('/api/admin/marketing/materials')).json();
+  assert.equal(materials.publishingEnabled,false);
+  assert.equal(materials.editorialPlan.length,4);
+  assert.equal('bookingSchedule' in materials,false);
+  assert.equal('bookingOccupancy' in materials,false);
+  const marketing=await (await request('/api/admin/marketing')).json();
+  assert.equal(marketing.version,1);
+  assert.equal((await request('/api/admin/marketing','PUT',marketing,{origin:'https://unrelated.example'})).status,403);
+  const body={data:marketing.data,version:marketing.version};
+  const writes=await Promise.all([request('/api/admin/marketing','PUT',body),request('/api/admin/marketing','PUT',body)]);
+  assert.deepEqual(writes.map(x=>x.status).sort(),[200,409]);
+  const bad=structuredClone(marketing.data);bad.telegramIdentityAccountId='not-a-real-token';
+  assert.equal((await request('/api/admin/marketing','PUT',{data:bad,version:2})).status,400);
+  assert.equal((await (await request('/api/session')).json()).authenticated,false);
   assert.equal((await request('/api/admin/marketing/publish','POST',{})).status,401);
   assert.equal((await request('/api/booking/appointments','POST',{})).status,503);
   const upload = await request('/api/media','POST',{name:'local-fixture.png',type:'image/png',base64:'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO/a2nQAAAAASUVORK5CYII='});

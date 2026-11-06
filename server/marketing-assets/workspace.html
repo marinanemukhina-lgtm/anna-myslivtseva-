@@ -16,10 +16,23 @@
 <link rel="stylesheet" href="/api/admin/marketing/assets/styles">
 </head>
 <body class="channelPage"><a class="skipLink" href="#workshop">К тексту поста</a><div class="shell">
-<aside class="side"><div class="brand"><b>АННА</b>МЫСЛИВЦЕВА · ПРОГРЕВ</div><nav class="nav"><a href="/admin">← Панель управления</a><button class="on" data-view="workshop">Мастерская</button><button data-view="dashboard">Приборная</button><button data-view="calendarView">Календарь</button></nav><div class="scope">Локальные правки остаются в этом браузере. Резервную копию можно сохранить на сервер отдельной кнопкой. Автопостинг не подключён ни к одному каналу. Карточки тем — рабочая карта тем. Статус «Опубликован» фиксирует уже вышедший пост по его ссылке.</div></aside>
+<aside class="side"><div class="brand"><b>АННА</b>МЫСЛИВЦЕВА · ПРОГРЕВ</div><nav class="nav"><a href="/admin">← Панель управления</a><button data-view="materialsView">Материалы и план</button><button class="on" data-view="workshop">Мастерская</button><button data-view="dashboard">Приборная</button><button data-view="calendarView">Календарь</button></nav><div class="scope">Локальные правки остаются в этом браузере. Резервную копию можно сохранить на сервер отдельной кнопкой. Автопостинг не подключён ни к одному каналу. Карточки тем — рабочая карта тем. Статус «Опубликован» фиксирует уже вышедший пост по его ссылке.</div></aside>
 <main class="main">
 <div class="topbar"><div><div class="eyebrow">Анна Мысливцева · рабочий контур</div><h1>Канал прогрева</h1><div class="lead">Последовательное раскрытие тем канала: самостоятельный заход → пост → след → карта раскрытия.</div></div><div class="tools"><button class="btn" id="exportBtn">Экспорт базы</button><button class="btn" id="importTrigger">Импорт JSON</button><input id="importFile" type="file" accept=".json" hidden><input id="telegramIdentity" hidden><button class="btn" id="serverLoad">Загрузить с сервера</button><button class="btn primary" id="serverSave">Сохранить на сервер</button></div></div>
-<section class="notice" style="margin:16px 0"><b>Перенесён готовый контур NEMUKHINA SYSTEM.</b> Мастерская, проверка, календарь и замеры сохранены. Посты, доступы и данные Марины не перенесены. Планирование здесь не отправляет сообщения.<br>Telegram и MAX: нужны отдельные аккаунты Анны, бот и права. Instagram: нужны разрешения Meta и правовая проверка, реклама в РФ ограничена. WhatsApp Статус: официальный автопостинг не подтверждён, только ручная публикация. Не вводите токены, данные пациентов и истории лечения. Не обещайте гарантированный результат; медицинские и рекламные утверждения требуют проверки.<br><b>Принцип поста:</b> полезное объяснение самой темы. В конце — короткое упоминание соответствующего подтверждённого диплома. Без рассказа о том, зачем Анна училась и как проходило обучение.<br><b>План с нуля:</b> заполните тему и адресата → подготовьте пост → пройдите редакторскую проверку → задайте дату → после самостоятельной публикации внесите ссылку → запишите фактические замеры. Готового плана Hormozi и работающих адаптеров публикации в исходном контуре не найдено.</section><div class="banner" id="banner" role="status" aria-live="polite"></div><span class="saveState" id="saveState" aria-live="polite">Локальная база · резервная копия через экспорт</span>
+<section class="notice" style="margin:16px 0"><b>Маркетинговая мастерская Анны.</b> В разделе «Материалы и план» собраны описание, соцсети, загруженные дипломы и рабочая последовательность публикаций. В мастерской сохранены 12 редактируемых тем, черновики, редакторская проверка и календарь.<br>Автопостинг не подключён. Планирование здесь не отправляет сообщения. Ключи доступа не вводите. Временный открытый доступ к админке распространяется и на материалы маркетинга.<br>В центре поста — полезное объяснение темы. Соответствующий подтверждённый диплом кратко упоминается в конце. Название программы само по себе не подтверждает квалификацию Анны.</section><div class="banner" id="banner" role="status" aria-live="polite"></div><span class="saveState" id="saveState" aria-live="polite">Локальная база · резервная копия через экспорт</span>
+
+
+<section class="view" id="materialsView">
+  <section class="card anna-materials"><h2>Материалы Анны</h2><p id="materialsStatus" role="status">Загружаем материалы…</p>
+    <div class="anna-material-grid">
+      <article><h3>Описание на сайте</h3><p id="annaDescription"></p><a href="/admin#profile">Редактировать описание</a></article>
+      <article><h3>Подготовленное описание · проект</h3><p id="annaPrepared"></p><p id="annaPreparedSource" class="sub"></p><a href="/admin#profile">Проверить и перенести в редактор</a></article>
+    </div>
+  </section>
+  <section class="card anna-materials"><h2>Соцсети</h2><p>Сохранённая ссылка — адрес страницы. Подключение аккаунта и отправка публикаций пока не настроены.</p><ul id="annaSocials"></ul><a href="/admin#social">Заполнить ссылки на соцсети</a></section>
+  <section class="card anna-materials"><h2>Дипломы и образование</h2><p id="annaQualification"></p><div id="annaDiplomas"></div><a href="/admin#diplomas">Открыть дипломы в админке</a></section>
+  <section class="card anna-materials"><h2>Маркетинговый план</h2><p>Рабочий проект из существующих тем. Последовательность можно использовать для подготовки материалов; даты и публикации ещё не назначены.</p><div id="annaPlan" class="anna-material-grid"></div><button class="btn" data-view="workshop">Открыть мастерскую постов</button></section>
+</section>
 
 <section class="view on" id="workshop">
 <div class="grid">
@@ -299,7 +312,7 @@ async function boot(){
  if(!state)state={schemaVersion:4,seedId:'empty',book:'Анна Мысливцева',telegramIdentityAccountId:'',chapters:[],concepts:[],posts:[],measures:[]};
  chapterId=state.chapters[0]?.id||'';renderChecks();renderAll();restoreWorking();restoreChannelView()
 }
-const channelViews = ['workshop','dashboard','calendarView'];
+const channelViews = ['workshop','dashboard','calendarView','materialsView'];
 function showChannelView(name, updateHistory=true){
  if(!channelViews.includes(name))return;
  document.querySelectorAll('[data-view]').forEach(button=>{
@@ -358,4 +371,5 @@ $('serverLoad').onclick=async()=>{if(serverBusy||!confirm('Заменить ло
 setServerBusy(true);
 (async()=>{try{await boot();const observed=storageBase,observedDraft=draftBase;const r=await serverRequest();if(observed===null&&observedDraft===null&&!storageBlocked&&!draftBlocked&&localStorage.getItem(KEY)===observed&&localStorage.getItem(DRAFT_KEY)===observedDraft){installServerWorkspace(migrate(r.data),r.version);}else banner('Есть локальная база или рабочий текст. Экспортируйте их и загрузите серверную копию перед сохранением на сервер.');}catch(e){banner(e.message);}finally{setServerBusy(false);}})();
 </script>
+<script src="/api/admin/marketing/assets/materials"></script>
 </body></html>

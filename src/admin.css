@@ -529,3 +529,5 @@
     width: 100%;
   }
 }
+
+.admin-marketing-link{display:flex;justify-content:space-between;gap:12px;border:1px solid var(--admin-border);padding:12px 14px;margin-bottom:24px;font-size:14px;min-height:45px}.admin-marketing-link:focus-visible{outline:2px solid #6380b6;outline-offset:4px}.admin-prepared-copy{background:#f6f7f9;border:1px solid var(--admin-border);padding:18px;margin:18px 0;line-height:1.7}.admin-prepared-copy p{margin:10px 0}.admin-prepared-copy .text-button{display:block;margin-top:14px}

@@ -9,7 +9,7 @@ test('copied marketing workspace is private, isolated, persistent and cannot pub
  const {createApp}=await import('../server/app.mjs');const server=createApp().listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));const base='http://127.0.0.1:'+server.address().port;let cookie='';
  const req=(p,method='GET',body,extra={})=>fetch(base+p,{method,headers:{origin:base,'content-type':'application/json',cookie,...extra},body:body===undefined?undefined:JSON.stringify(body)});
  t.after(async()=>{await new Promise(r=>server.close(r));await rm(dir,{recursive:true,force:true});});
- for(const p of ['/admin/marketing','/api/admin/marketing','/api/admin/marketing/seed','/api/admin/marketing/assets/safety'])assert.equal((await req(p)).status,401);
+ for(const p of ['/admin/marketing','/api/admin/marketing','/api/admin/marketing/seed','/api/admin/marketing/assets/safety','/api/admin/marketing/materials','/api/admin/marketing/assets/materials'])assert.equal((await req(p)).status,401);
  const login=await req('/api/session','POST',{password:'synthetic-password'});cookie=login.headers.get('set-cookie').split(';')[0];
  const html=await req('/admin/marketing');assert.equal(html.status,200);assert.match(html.headers.get('cache-control'),/no-store/);assert.match(await html.text(),/anna_warmup_channel_v4/);
  let state=await(await req('/api/admin/marketing')).json();assert.equal(state.publishingEnabled,false);assert.equal(state.data.posts.length,0);assert.equal(state.data.telegramIdentityAccountId,'');

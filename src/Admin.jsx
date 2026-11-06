@@ -2,10 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 import { mergeSavedPayload } from "../shared/admin-save.mjs";
 import { useSite } from "./App.jsx";
 import "./admin.css";
+import { profileDraft, socialChannels } from "../shared/anna-materials.mjs";
 import AdminCalendar from "./AdminCalendar.jsx";
 import { mergeScheduleSave } from "./booking-client.mjs";
 const tabs = [
   ["profile", "О себе и сайт"],
+  ["social", "Соцсети"],
   ["calendar", "Календарь и запись"],
   ["services", "Услуги и цены"],
   ["news", "Новости"],
@@ -158,7 +160,7 @@ export default function Admin() {
     [configured, setConfigured] = useState(true),
     [password, setPassword] = useState(""),
     [payload, setPayload] = useState(null),
-    [tab, setTab] = useState("profile"),
+    [tab, setTab] = useState(() => tabs.some(([key]) => key === location.hash.slice(1)) ? location.hash.slice(1) : "profile"),
     [selected, setSelected] = useState(null),
     [dirty, setDirty] = useState(false),
     [busy, setBusy] = useState(false),
@@ -292,7 +294,7 @@ export default function Admin() {
       d.profile[key] = value;
     });
   const item =
-    payload && tab !== "profile" && tab !== "calendar"
+    payload && tab !== "profile" && tab !== "calendar" && tab !== "social"
       ? payload.data[tab].find((x) => x.id === selected)
       : null;
   const changeItem = (key, value) =>
@@ -413,6 +415,10 @@ export default function Admin() {
         >
           Истории пациентов <span aria-hidden="true">→</span>
         </a>
+        <a className="admin-marketing-link" href="/admin/marketing" onClick={(event) => {
+          if (busy || calendarBusy || sessionBusy) { event.preventDefault(); return; }
+          if ((dirty || calendarDirty) && !confirm("Есть несохранённые изменения. Перейти в маркетинг без сохранения?")) event.preventDefault();
+        }}>Маркетинг и прогрев <span aria-hidden="true">→</span></a>
         <span className="eyebrow">Управление сайтом</span>
         <nav>
           {visibleTabs.map(([key, label]) => (
@@ -423,12 +429,13 @@ export default function Admin() {
               onClick={() => {
                 if (calendarDirty && key !== tab && !confirm("Есть несохранённое расписание. Перейти без сохранения?")) return;
                 setTab(key);
+                history.replaceState(null, "", "#" + key);
                 setSelected(null);
                 setError("");
               }}
             >
               {label}
-              {payload && key !== "profile" && key !== "calendar" && (
+              {payload && key !== "profile" && key !== "calendar" && key !== "social" && (
                 <span>{payload.data[key].length}</span>
               )}
             </button>
@@ -436,7 +443,6 @@ export default function Admin() {
         </nav>
         <div className="admin-sidebar-bottom">
           <a href="/demo/booking" target="_blank" rel="noreferrer">Демо онлайн-записи</a>
-          {!contentOnlyAccess && <a href="/admin/marketing">Маркетинг и прогрев</a>}
           <a href="/" target="_blank" rel="noreferrer">
             Открыть сайт
           </a>
@@ -535,10 +541,32 @@ export default function Admin() {
           <p>Загрузка…</p>
         ) : tab === "calendar" ? (
           <AdminCalendar key={temporaryCalendarAccess ? "temporary" : "owner"} temporaryCalendarAccess={temporaryCalendarAccess} services={payload.data.services} onDirtyChange={setCalendarDirty} onBusyChange={setCalendarBusy} onUnauthenticated={() => setAuth(false)} onSaved={(previousVersion, saved) => setPayload(current => mergeScheduleSave(current, previousVersion, saved))} />
+        ) : tab === "social" ? (
+          <section className="admin-card">
+            <h2>Соцсети Анны</h2>
+            <p>Адреса страниц и каналов. Сохранение ссылки не подключает аккаунт и не включает отправку сообщений.</p>
+            <div className="admin-fields">
+              {socialChannels.map(([key,label]) => <Field key={key} label={label + " · ссылка"} type="url"
+                value={payload.data.profile.socialLinks?.[key] ?? ""}
+                onChange={value => changeProfile("socialLinks", {...payload.data.profile.socialLinks, [key]:value})}
+                hint={payload.data.profile.socialLinks?.[key] ? "Ссылка указана в редакторе. Автопостинг не подключён." : "Адрес пока не указан."}/>)}
+              <Field label="Основная ссылка на соцсеть" type="url" value={payload.data.profile.socialUrl} onChange={value => changeProfile("socialUrl",value)} hint="Эта ссылка используется в публичных контактах сайта."/>
+            </div>
+            <p><a href="/admin/marketing">Перейти к маркетинговому плану</a></p>
+          </section>
         ) : tab === "profile" ? (
           <form className="profile-form" onSubmit={save}>
             <section className="admin-card">
               <h2>Личная информация</h2>
+              {(!payload.data.profile.intro || !payload.data.profile.about) && <div className="admin-prepared-copy">
+                <h3>Подготовленное описание · для проверки</h3>
+                <p>{profileDraft.intro}</p><p>{profileDraft.about}</p><small>{profileDraft.source}</small>
+                <button type="button" className="text-button" onClick={() => change(d => {
+                  if (!d.profile.intro) d.profile.intro=profileDraft.intro;
+                  if (!d.profile.about) d.profile.about=profileDraft.about;
+                })}>Заполнить пустые поля этим текстом</button>
+                <p>Текст попадёт в редактор. Публикация — после кнопки «Сохранить изменения».</p>
+              </div>}
               <div className="admin-fields">
                 <Field
                   label="Имя и фамилия"

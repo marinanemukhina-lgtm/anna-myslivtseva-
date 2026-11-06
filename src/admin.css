@@ -108,6 +108,16 @@
   opacity: 0.35;
   cursor: default;
 }
+.admin-patients-link {
+  margin-bottom: 24px;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.admin-patients-link[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+}
 .admin-card {
   padding: 28px;
   background: white;

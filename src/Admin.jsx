@@ -402,6 +402,17 @@ export default function Admin() {
           <br />
           Мысливцева
         </a>
+        <a
+          href="/admin/patients"
+          className="admin-primary admin-patients-link"
+          aria-disabled={busy || calendarBusy || sessionBusy}
+          onClick={(event) => {
+            if (busy || calendarBusy || sessionBusy) { event.preventDefault(); return; }
+            if ((dirty || calendarDirty) && !confirm("Есть несохранённые изменения. Перейти в истории пациентов без сохранения?")) event.preventDefault();
+          }}
+        >
+          Истории пациентов <span aria-hidden="true">→</span>
+        </a>
         <span className="eyebrow">Управление сайтом</span>
         <nav>
           {visibleTabs.map(([key, label]) => (
@@ -424,7 +435,6 @@ export default function Admin() {
           ))}
         </nav>
         <div className="admin-sidebar-bottom">
-          <a href="/admin/patients">Пациенты и истории · демо</a>
           <a href="/demo/booking" target="_blank" rel="noreferrer">Демо онлайн-записи</a>
           {!contentOnlyAccess && <a href="/admin/marketing">Маркетинг и прогрев</a>}
           <a href="/" target="_blank" rel="noreferrer">

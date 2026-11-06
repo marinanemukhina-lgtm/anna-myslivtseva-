@@ -91,3 +91,57 @@ test('cleared editing draft cannot become an orphan when the saved post is sched
  h.element('text').value='New draft after scheduling';assert.equal(h.run('saveWorking()'),true);
  assert.equal(h.run('state.workingDraft.post.text'),'New draft after scheduling');
 });
+
+test('import restores the working draft from the exported candidate without mutating it away',async()=>{
+ const h=harness();await h.ready;const incoming=withDraft('Synthetic imported working text');
+ const input={files:[{size:100,text:async()=>JSON.stringify(incoming)}],value:'selected.json'};
+ await h.element('importFile').onchange({target:input});
+ assert.equal(h.element('text').value,'Synthetic imported working text');
+ assert.equal(JSON.parse(h.storage.get(DRAFT_KEY)).post.text,'Synthetic imported working text');
+ assert.equal(JSON.parse(h.storage.get(KEY)).workingDraft.post.text,'Synthetic imported working text');
+ assert.equal(input.value,'');assert.match(h.element('banner').textContent,/импортирована/);
+});
+
+test('cancelled import leaves the current text and storage untouched',async()=>{
+ const h=harness();await h.ready;h.context.confirm=()=>false;
+ const before=[h.storage.get(KEY),h.storage.get(DRAFT_KEY)];
+ await h.element('importFile').onchange({target:{files:[{size:1,text:async()=>JSON.stringify(withDraft('Do not import'))}],value:'file.json'}});
+ assert.deepEqual([h.storage.get(KEY),h.storage.get(DRAFT_KEY)],before);assert.equal(h.element('text').value,'Server working text');
+});
+
+test('Back closes a topic dialog without saving and Forward cannot revive its abandoned fields',async()=>{
+ const h=harness();await h.ready;const calls=[];
+ h.context.history={state:null,pushState(value){this.state=value;calls.push('push')},replaceState(value){this.state=value;calls.push('replace')},back(){calls.push('back')}};
+ const before=h.storage.get(KEY);
+ h.run("openModal('chapterModal');chapterEdit={adding:true,card:{title:'Unsubmitted'}}");
+ assert.equal(h.element('.shell').inert,true);assert.equal(h.run('activeModal'),'chapterModal');
+ h.context.history.state=null;h.listeners.get('popstate')();
+ assert.equal(h.run('activeModal'),null);assert.equal(h.run('chapterEdit'),null);assert.equal(h.element('.shell').inert,false);assert.equal(h.storage.get(KEY),before);
+ h.context.history.state={marketingModal:'chapterModal'};h.listeners.get('popstate')();
+ assert.equal(h.run('activeModal'),null);assert.equal(h.context.history.state,null);assert.deepEqual(calls,['push','replace']);
+});
+
+test('dialog validation is announced inside the open modal instead of only behind it',async()=>{
+ const h=harness();await h.ready;const message=h.element('modal-feedback');
+ h.element('chapterModal').querySelector=selector=>selector==='.modalMessage'?message:null;
+ h.run("openModal('chapterModal');banner('Введите название темы.')");
+ assert.equal(message.textContent,'Введите название темы.');
+ h.run("closeModal('chapterModal');openModal('chapterModal')");assert.equal(message.textContent,'');
+});
+
+test('opening a saved post can be cancelled and never overwrites another tab working text',async()=>{
+ const data=withDraft('Unfinished new text');data.posts=[{...structuredClone(data.workingDraft.post),id:'saved-post',text:'Saved post'}];
+ const h=harness({data});await h.ready;const oldQuery=h.context.document.querySelector;
+ h.context.document.querySelector=selector=>selector.includes(':checked')?null:oldQuery(selector);
+ h.context.confirm=()=>false;h.run("editPost('saved-post')");assert.equal(h.element('text').value,'Unfinished new text');assert.equal(h.run('state.posts.length'),1);
+ const external=JSON.stringify(withDraft('Other tab').workingDraft);h.storage.set(DRAFT_KEY,external);h.context.confirm=()=>true;
+ assert.throws(()=>h.run("editPost('saved-post')"),/другой вкладке/);assert.equal(h.element('text').value,'Unfinished new text');assert.equal(h.storage.get(DRAFT_KEY),external);
+});
+
+test('opening a saved post preserves unfinished work as a separate draft after approval',async()=>{
+ const data=withDraft('Unfinished new text');data.posts=[{...structuredClone(data.workingDraft.post),id:'saved-post',text:'Saved post'}];
+ const h=harness({data});await h.ready;const oldQuery=h.context.document.querySelector;
+ h.context.document.querySelector=selector=>selector.includes(':checked')?null:oldQuery(selector);
+ h.run("editPost('saved-post')");assert.equal(h.run('state.posts.length'),2);assert.equal(h.run('state.posts[1].text'),'Unfinished new text');
+ assert.equal(h.element('text').value,'Saved post');assert.equal(h.run('editingId'),'saved-post');
+});

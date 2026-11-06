@@ -1681,6 +1681,7 @@ html { scroll-padding-top: 110px; }
 .footer-tagline { font: 500 clamp(42px,4.5vw,72px)/1.02 var(--serif); margin-bottom: 65px; }
 .footer-tagline>span { font: 500 13px/2 var(--sans); letter-spacing: .07em; text-transform: uppercase; }
 .footer-grid { grid-template-columns: minmax(0,420px) 200px; gap: 60px; }
+.footer-grid.single-column { grid-template-columns: minmax(0,1fr); max-width: 420px; }
 .footer .contacts { font-size: 15px; }
 .hours { font-size: 14px; }
 .footer-bottom { font-size: 12px; flex-wrap: wrap; }

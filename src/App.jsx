@@ -108,50 +108,50 @@ const nav = [
   ["/diplomas", "Дипломы"],
   ["/contact", "Запись на приём"],
 ];
+const trimProfile = (profile) => Object.fromEntries(
+  Object.entries(profile).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]),
+);
+const hasContactDetails = (profile) => Boolean(
+  profile.address || profile.mapUrl || profile.phone || profile.email || profile.socialUrl,
+);
 function Contacts({ compact = false, profile }) {
   const { data } = useSite();
-  const p = profile || data.profile;
-  if (!p.address && !p.phone && !p.email && !p.socialUrl) return null;
+  const p = trimProfile(profile || data.profile);
+  if (!hasContactDetails(p)) return null;
   return (
     <div className={"contacts " + (compact ? "compact" : "")}>
-      <div>
+      {(p.address || p.mapUrl) && <div>
         <span>А.</span>
         <p>
-          {p.address || "—"}
+          {p.address}
           {p.mapUrl && (
             <>
-              <br />
+              {p.address && <br />}
               <a href={p.mapUrl} target="_blank" rel="noreferrer">
                 Как добраться
               </a>
             </>
           )}
         </p>
-      </div>
-      <div>
+      </div>}
+      {(p.email || p.phone) && <div>
         <span>К.</span>
         <p>
-          {p.email ? <a href={"mailto:" + p.email}>{p.email}</a> : "—"}
-          <br />
-          {p.phone ? (
+          {p.email && <a href={"mailto:" + p.email}>{p.email}</a>}
+          {p.email && p.phone && <br />}
+          {p.phone && (
             <a href={"tel:" + p.phone.replace(/[^+\d]/g, "")}>{p.phone}</a>
-          ) : (
-            "—"
           )}
         </p>
-      </div>
-      <div>
+      </div>}
+      {p.socialUrl && <div>
         <span>С.</span>
         <p>
-          {p.socialUrl ? (
-            <a href={p.socialUrl} target="_blank" rel="noreferrer">
-              Социальная сеть
-            </a>
-          ) : (
-            "—"
-          )}
+          <a href={p.socialUrl} target="_blank" rel="noreferrer">
+            Социальная сеть
+          </a>
         </p>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -264,18 +264,17 @@ function Header({ isHome }) {
 }
 function Footer() {
   const { data, motion, setMotion } = useSite();
+  const p = trimProfile(data.profile);
   return (
     <footer className="footer">
       <p className="footer-tagline">{data.profile.name}<br /><span>{data.profile.role}</span></p>
-      <div className="footer-grid">
-        <Contacts />
-        {!data.profile.address && !data.profile.phone && !data.profile.email && !data.profile.socialUrl && <p className="footer-contact-note">Контакты для записи пока не опубликованы.</p>}
-        <div className="hours">
+      <div className={"footer-grid" + (p.hours ? "" : " single-column")}>
+        <Contacts profile={p} />
+        {!hasContactDetails(p) && <p className="footer-contact-note">Контакты для записи пока не опубликованы.</p>}
+        {p.hours && <div className="hours">
           <span className="eyebrow">Часы приёма</span>
-          {data.profile.hours ? (
-            <p className="pre-line">{data.profile.hours}</p>
-          ) : null}
-        </div>
+          <p className="pre-line">{p.hours}</p>
+        </div>}
       </div>
       <div className="footer-bottom">
         <span>
@@ -967,7 +966,7 @@ function formatDate(s) {
 }
 function Contact() {
   const { data } = useSite();
-  const p = Object.fromEntries(Object.entries(data.profile).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
+  const p = trimProfile(data.profile);
   return (
     <>
       <PageHero first="Запись" last="на приём." />

@@ -6,7 +6,7 @@ export const PROCEDURES = ['Демонстрационная процедура'
 export const ANGLES = ['Спереди', 'Сбоку', 'Сзади'];
 const clientSchema = z.object({ id: z.string().uuid(), label: z.enum(PERSONAS) }).strict();
 export const visitInput = z.object({ clientId: z.string().uuid(), date: dateSchema,
-  procedure: z.enum(PROCEDURES), note: z.enum(NOTES) }).strict();
+  procedure: z.enum(PROCEDURES), note: z.string().trim().max(4000) }).strict();
 const photoSchema = z.object({ visitId: z.string().uuid(), angle: z.enum(ANGLES),
   data: z.string().max(1400000).regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/) }).strict();
 export const clinicalStateSchema = z.object({ schema: z.literal('anna-open-synthetic-clinical-v2'),

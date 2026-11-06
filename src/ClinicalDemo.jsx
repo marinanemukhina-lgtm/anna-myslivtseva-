@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { PERSONAS, NOTES, PROCEDURES, ANGLES, restoreClinicalDemo, emptyClinicalDemo, exampleClinicalDemo, addDemoClient, addDemoVisit, setDemoPhoto } from '../shared/clinical-demo.mjs';
+import { PERSONAS, PROCEDURES, ANGLES, restoreClinicalDemo, emptyClinicalDemo, exampleClinicalDemo, addDemoClient, addDemoVisit, setDemoPhoto } from '../shared/clinical-demo.mjs';
 import './clinical-demo.css';
+import VoiceNote from './VoiceNote.jsx';
 const STORAGE = 'anna-open-synthetic-clinical-v1';
 function initial() {
   try { const saved = localStorage.getItem(STORAGE); return saved ? restoreClinicalDemo(JSON.parse(saved)) : exampleClinicalDemo(); }
@@ -16,9 +17,12 @@ function PhotoPanel({ label, visit, visits, angle, photo, busy, onSelect, onPhot
 }
 export default function ClinicalDemo() {
   const [state, setState] = useState(initial), [selected, setSelected] = useState(() => initial().clients[0]?.id ?? '');
-  const [day, setDay] = useState('2026-11-06'), [procedure, setProcedure] = useState(PROCEDURES[0]), [note, setNote] = useState(NOTES[0]);
-  const [message, setMessage] = useState(''), [busy,setBusy] = useState(false), [angle,setAngle] = useState(ANGLES[0]);
+  const [day, setDay] = useState('2026-11-06'), [procedure, setProcedure] = useState(PROCEDURES[0]), [drafts, setDrafts] = useState({});
+  const [message, setMessage] = useState(''), [photoBusy,setBusy] = useState(false), [angle,setAngle] = useState(ANGLES[0]);
   const [beforeId,setBeforeId] = useState(''), [afterId,setAfterId] = useState('');
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const busy = photoBusy || voiceBusy, note = drafts[selected] ?? '';
+  const setNote = value => setDrafts(current => ({...current, [selected]: value}));
   const client = state.clients.find(c => c.id === selected), visits = state.visits.filter(v => v.clientId === selected).sort((a,b)=>a.date.localeCompare(b.date));
   const before = visits.find(v=>v.id===beforeId) ?? visits[0], after = visits.find(v=>v.id===afterId) ?? visits.at(-1);
   const photo = visit => state.photos.find(p=>p.visitId===visit?.id && p.angle===angle);
@@ -35,7 +39,8 @@ export default function ClinicalDemo() {
   }
   function visit(event) {
     event.preventDefault();
-    try { const next=addDemoVisit(state, { clientId: selected, date: day, procedure, note }); if(save(next, 'Тестовая процедура добавлена.')) setAfterId(next.visits.at(-1).id); }
+    if (busy) return;
+    try { const next=addDemoVisit(state, { clientId: selected, date: day, procedure, note }); if(save(next, 'Тестовая процедура добавлена.')) { setAfterId(next.visits.at(-1).id); setNote(''); } }
     catch { setMessage('Проверьте дату и тестовые поля.'); }
   }
   async function upload(event,visitId,photoAngle) {
@@ -54,7 +59,7 @@ export default function ClinicalDemo() {
     finally {setBusy(false);}
   }
   function example() { const next=exampleClinicalDemo();if(save(next,'Пример восстановлен.')){setSelected(next.clients[0].id);setBeforeId('');setAfterId('');} }
-  function clear() { if(!confirm('Очистить только тестовые карты и фотографии в этом браузере?'))return;if(save(emptyClinicalDemo(),'Тестовые карты очищены.'))choose(''); }
+  function clear() { if(!confirm('Очистить только тестовые карты и фотографии в этом браузере?'))return;if(save(emptyClinicalDemo(),'Тестовые карты очищены.')) { choose(''); setDrafts({}); } }
   function download() {
     const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download='anna-synthetic-histories.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
@@ -63,14 +68,14 @@ export default function ClinicalDemo() {
     <nav className="clinical-nav" aria-label="Разделы демонстрации"><a href="/">Сайт Анны</a><a href="/admin">Админка</a><a href="/demo/booking">Онлайн-запись · демо</a></nav>
     <h1>Пациенты и истории</h1>
     <p className="clinical-lead">Карта пациента, посещения и фотографии до и после.</p>
-    <p className="clinical-demo-note">Открытый пример с вымышленными картами. Используйте только тестовые изображения. Карты и фото сохраняются в этом браузере и не отправляются на сервер.</p>
+    <p className="clinical-demo-note">Открытый пример с вымышленными картами. Используйте только вымышленные заметки и тестовые изображения. Карты и фото сохраняются в этом браузере и не отправляются на сервер.</p>
     <div className="clinical-actions">
       {unused.length>0 && <button className="admin-primary" disabled={busy} onClick={create}>Создать {unused[0]}</button>}
       <button className="clinical-secondary" onClick={download}>Скачать тестовые истории</button>
       <button className="clinical-secondary" disabled={busy} onClick={clear}>Начать с пустого кабинета</button>
       {!state.clients.length && <button className="clinical-secondary" onClick={example}>Показать пример истории</button>}
     </div>
-    <p role="status" className="clinical-status">{busy ? 'Сохраняем тестовое фото…' : message}</p>
+    <p role="status" className="clinical-status">{photoBusy ? 'Сохраняем тестовое фото…' : message}</p>
     <div className="clinical-grid">
       <aside className="clinical-people"><h2>Карты</h2>{state.clients.map(c=><button key={c.id} disabled={busy} className={selected===c.id?'active':''} onClick={()=>choose(c.id)}>{c.label}</button>)}{!state.clients.length && <p>Кабинет пуст. Создайте тестовую карту.</p>}</aside>
       <div className="clinical-main">{client ? <>
@@ -84,7 +89,7 @@ export default function ClinicalDemo() {
         <section className="clinical-card"><h3>Добавить процедуру</h3><form onSubmit={visit} className="clinical-form">
           <label>Дата<input type="date" value={day} required disabled={busy} onChange={e=>setDay(e.target.value)}/></label>
           <label>Процедура<select value={procedure} disabled={busy} onChange={e=>setProcedure(e.target.value)}>{PROCEDURES.map(x=><option key={x}>{x}</option>)}</select></label>
-          <label>Наблюдение<select value={note} disabled={busy} onChange={e=>setNote(e.target.value)}>{NOTES.map(x=><option key={x}>{x}</option>)}</select></label>
+          <VoiceNote key={selected} value={note} onChange={setNote} disabled={photoBusy} onBusy={setVoiceBusy}/>
           <button className="admin-primary" disabled={busy} type="submit">Сохранить процедуру</button>
         </form></section>
       </> : <section className="clinical-card"><h2>Начните с тестовой карты</h2><p>Здесь появятся история посещений и фотографии до и после.</p></section>}</div>

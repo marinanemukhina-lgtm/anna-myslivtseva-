@@ -519,3 +519,16 @@
     width: 100%;
   }
 }
+
+@media (max-width: 900px) {
+  .admin-sidebar-bottom a,
+  .admin-sidebar-bottom button {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-block: 8px;
+  }
+}
+@media (max-width: 600px) {
+  .admin-sidebar-bottom { flex-wrap: wrap; }
+}

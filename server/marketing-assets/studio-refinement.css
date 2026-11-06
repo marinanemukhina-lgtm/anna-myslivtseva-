@@ -15,3 +15,30 @@ input,select,textarea{min-height:44px;font-size:16px;border-radius:7px;backgroun
 .vaultPage .box{max-height:calc(100dvh - 40px);overflow-y:auto}.vaultPage #masterAgainField{margin-top:18px}.vaultPage #restoreTrigger{width:100%}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 @media(prefers-color-scheme:dark){html,body,.card,.chapter,input,select,textarea,.day,.postrow,.dialog,.box{background:#fff;color:var(--ink)}.primary,.btn.primary{background:var(--accent);color:#fff}.chapter.on{background:#f2f5ff}}
+
+/* Phone authoring keeps existing controls readable and reachable. */
+.channelPage .nav{flex-wrap:nowrap}
+.channelPage .nav a,.channelPage .nav button,.channelPage .btn,.channelPage .chapter{overflow-wrap:anywhere}
+.channelPage .review button,.channelPage .calpost{min-height:44px}
+.channelPage .calendarScroll{overflow-x:auto;overscroll-behavior-x:contain;border-radius:2px}
+.channelPage .calendar{min-width:630px;overflow:visible}
+.channelPage .calendarScroll:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.channelPage .modal{padding:12px}
+.channelPage .dialog{max-height:calc(100dvh - 24px);overscroll-behavior:contain;min-width:0}
+.channelPage .modalMessage:not(:empty){margin-top:16px;padding:12px;background:var(--signal);border:1px solid var(--signal-line);border-radius:7px;font-size:14px}
+.channelPage .dialog h2,.channelPage .sub,.channelPage .postrow,.channelPage .chapter{overflow-wrap:anywhere}
+.channelPage .postrow>div{min-width:0}
+.channelPage #text{scroll-margin-top:88px}
+@media(max-width:1120px){.channelPage .banner{top:76px}}
+@media(max-width:720px){
+ .channelPage .nav{padding-bottom:2px}
+ .channelPage .banner{top:66px;max-height:30dvh;overflow-y:auto}
+ .channelPage .dialog{padding:16px}
+ .channelPage .dialog .toolbar{bottom:-16px;gap:8px}
+ .channelPage .dialog .toolbar .btn{flex:1 1 140px}
+ .channelPage .conceptRow{grid-template-columns:1fr}
+ .channelPage .calpost{font-size:12px;padding:8px}
+ .channelPage .day{padding:6px}
+ .channelPage .skipLink{position:static;display:inline-block;min-height:44px;margin:4px 8px;padding:10px;color:var(--accent)}
+}
+@media(max-height:480px){.channelPage .dialog .toolbar{position:static}.channelPage .modal{padding:6px}.channelPage .dialog{max-height:calc(100dvh - 12px)}}

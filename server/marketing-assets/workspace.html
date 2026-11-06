@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light only">
+<meta name="theme-color" content="#fffcf8">
+<link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/svg+xml" sizes="any" href="/favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
 <title>Анна Мысливцева — Канал прогрева</title>
 <style>
 :root{--paper:#fff;--bg:#f5f6f8;--ink:#2b3b49;--head:#051c2c;--muted:#5f7180;--line:#d8dfe7;--accent:#2251ff;--accent-soft:#edf1ff;--signal:#fff5d9;--signal-line:#c58a00;--ok:#eaf7ef;--ok-line:#287a4d;--dark:#071a28}
@@ -16,7 +22,7 @@
 <link rel="stylesheet" href="/api/admin/marketing/assets/styles">
 </head>
 <body class="channelPage"><a class="skipLink" href="#workshop">К тексту поста</a><div class="shell">
-<aside class="side"><div class="brand"><b>АННА</b>МЫСЛИВЦЕВА · ПРОГРЕВ</div><nav class="nav"><a href="/admin">← Панель управления</a><button class="on" data-view="workshop">Мастерская</button><button data-view="dashboard">Приборная</button><button data-view="calendarView">Календарь</button></nav><div class="scope">Локальные правки остаются в этом браузере. Резервную копию можно сохранить на сервер отдельной кнопкой. Автопостинг не подключён ни к одному каналу. Карточки тем — рабочая карта тем. Статус «Опубликован» фиксирует уже вышедший пост по его ссылке.</div></aside>
+<aside class="side"><div class="brand"><b>АННА</b>МЫСЛИВЦЕВА · ПРОГРЕВ</div><nav class="nav" aria-label="Канал прогрева"><a href="/admin">← Панель управления</a><button class="on" data-view="workshop">Мастерская</button><button data-view="dashboard">Приборная</button><button data-view="calendarView">Календарь</button></nav><div class="scope">Локальные правки остаются в этом браузере. Резервную копию можно сохранить на сервер отдельной кнопкой. Автопостинг не подключён ни к одному каналу. Карточки тем — рабочая карта тем. Статус «Опубликован» фиксирует уже вышедший пост по его ссылке.</div></aside>
 <main class="main">
 <div class="topbar"><div><div class="eyebrow">Анна Мысливцева · рабочий контур</div><h1>Канал прогрева</h1><div class="lead">Последовательное раскрытие тем канала: самостоятельный заход → пост → след → карта раскрытия.</div></div><div class="tools"><button class="btn" id="exportBtn">Экспорт базы</button><button class="btn" id="importTrigger">Импорт JSON</button><input id="importFile" type="file" accept=".json" hidden><input id="telegramIdentity" hidden><button class="btn" id="serverLoad">Загрузить с сервера</button><button class="btn primary" id="serverSave">Сохранить на сервер</button></div></div>
 <section class="notice" style="margin:16px 0"><b>Перенесён готовый контур NEMUKHINA SYSTEM.</b> Мастерская, проверка, календарь и замеры сохранены. Посты, доступы и данные Марины не перенесены. Планирование здесь не отправляет сообщения.<br>Telegram и MAX: нужны отдельные аккаунты Анны, бот и права. Instagram: нужны разрешения Meta и правовая проверка, реклама в РФ ограничена. WhatsApp Статус: официальный автопостинг не подтверждён, только ручная публикация. Не вводите токены, данные пациентов и истории лечения. Не обещайте гарантированный результат; медицинские и рекламные утверждения требуют проверки.<br><b>Принцип поста:</b> полезное объяснение самой темы. В конце — короткое упоминание соответствующего подтверждённого диплома. Без рассказа о том, зачем Анна училась и как проходило обучение.<br><b>План с нуля:</b> заполните тему и адресата → подготовьте пост → пройдите редакторскую проверку → задайте дату → после самостоятельной публикации внесите ссылку → запишите фактические замеры. Готового плана Hormozi и работающих адаптеров публикации в исходном контуре не найдено.</section><div class="banner" id="banner" role="status" aria-live="polite"></div><span class="saveState" id="saveState" aria-live="polite">Локальная база · резервная копия через экспорт</span>
@@ -50,19 +56,19 @@
 <section class="card" style="margin-top:16px"><table><caption>Что сработало</caption><thead><tr><th>Пост</th><th>Изменение аудитории</th><th>Запись</th><th>Услуги</th><th>Сохранения</th><th>Реакции</th></tr></thead><tbody id="effect"></tbody></table></section>
 </section>
 
-<section class="view" id="calendarView"><div class="calendarTop"><div><h2 id="monthTitle" style="margin:0"></h2><div class="sub">Перетащите карточку на другой день. Можно также нажать на пост и изменить дату. Время указано в часовом поясе устройства.</div></div><div class="toolbar"><button class="btn" id="prevMonth">←</button><button class="btn" id="todayMonth">Сегодня</button><button class="btn" id="nextMonth">→</button></div></div><div class="calendar" id="calendar"></div></section>
+<section class="view" id="calendarView"><div class="calendarTop"><div><h2 id="monthTitle" style="margin:0"></h2><div class="sub">Нажмите на пост, чтобы выбрать дату и время без перетаскивания. Календарь можно прокрутить в сторону. Время указано в часовом поясе устройства.</div></div><div class="toolbar"><button class="btn" id="prevMonth" aria-label="Предыдущий месяц">←</button><button class="btn" id="todayMonth">Сегодня</button><button class="btn" id="nextMonth" aria-label="Следующий месяц">→</button></div></div><div class="calendarScroll" role="region" aria-label="Календарь постов" tabindex="0"><div class="calendar" id="calendar"></div></div></section>
 </main></div>
 
 <div class="modal" id="chapterModal"><div class="dialog"><h2>Карточка темы</h2><div class="sub">Смысловые поля заполняет автор. Текст темы нужен только для проверки прямой вставки.</div><div class="formGrid" id="chapterForm">
 <div class="field full"><label>Название</label><input data-cf="title"></div><div class="field full"><label>Главное различение</label><textarea data-cf="distinction"></textarea></div><div class="field"><label>Что привык думать читатель</label><textarea data-cf="habit"></textarea></div><div class="field"><label>Что тема даёт увидеть</label><textarea data-cf="reveals"></textarea></div><div class="field"><label>Ключевые образы · по одному с новой строки</label><textarea data-cf="images"></textarea></div><div class="field"><label>Напряжения · по одному с новой строки</label><textarea data-cf="tensions"></textarea></div><div class="field full"><label>Где читатель узнаёт себя</label><textarea data-cf="recognition"></textarea></div><div class="field"><label>Понятия, вводимые здесь · по одному с новой строки</label><textarea data-cf="introduces"></textarea></div><div class="field"><label>Понятия-предпосылки · по одному с новой строки</label><textarea data-cf="requires"></textarea></div><div class="field full"><label>Что пока нельзя раскрывать</label><textarea data-cf="forbidden"></textarea></div><div class="field"><label><input type="checkbox" data-cf="factCheck" style="width:auto"> Требует проверки факта и диплома</label><label for="diplomaSourceNote">Источник квалификации: название диплома, ссылка и подтверждённая тема. Краткое подтверждение подготовки для конца поста.</label><textarea id="diplomaSourceNote" data-cf="factNote" placeholder="Заполнить по настоящему диплому Анны. Не придумывать обучение."></textarea></div><div class="field"><label>Исходный текст темы для проверки совпадений</label><textarea data-cf="sourceText"></textarea></div>
-</div><div class="toolbar"><button class="btn" data-close="chapterModal">Отмена</button><button class="btn primary" id="saveChapter">Сохранить карточку</button></div></div></div>
+</div><div class="modalMessage" role="status" aria-live="polite"></div><div class="toolbar"><button class="btn" data-close="chapterModal">Отмена</button><button class="btn primary" id="saveChapter">Сохранить карточку</button></div></div></div>
 
 <div class="modal" id="postModal"><div class="dialog"><h2 id="postModalTitle">Статус поста</h2><div class="sub" id="postModalLead"></div><div class="formGrid">
 <div class="field"><label>Дата и время</label><input id="statusDate" type="datetime-local"></div><div class="field"><label>Ссылка на публикацию</label><input id="publicationUrl" placeholder="https://t.me/..."></div>
 <div class="field"><label>Подписчиков до</label><input id="subBefore" type="number" min="0"></div><div class="field"><label>Подписчиков через сутки</label><input id="subAfter" type="number" min="0"></div>
 <div class="field"><label>Переходы к записи</label><input id="mShoulders" type="number" min="0"></div><div class="field"><label>Переходы к услугам</label><input id="mBook" type="number" min="0"></div>
 <div class="field"><label>Сохранения</label><input id="mSaves" type="number" min="0"></div><div class="field"><label>Реакции</label><input id="mReactions" type="number" min="0"></div>
-</div><div class="toolbar"><button class="btn" data-close="postModal">Закрыть</button><button class="btn" id="schedulePost">Запланировать</button><button class="btn primary" id="publishPost">Отметить опубликованным</button><button class="btn" id="saveMeasure">Сохранить замер</button></div></div></div>
+</div><div class="modalMessage" role="status" aria-live="polite"></div><div class="toolbar"><button class="btn" data-close="postModal">Закрыть</button><button class="btn" id="schedulePost">Запланировать</button><button class="btn primary" id="publishPost">Отметить опубликованным</button><button class="btn" id="saveMeasure">Сохранить замер</button></div></div></div>
 
 <script src="/api/admin/marketing/assets/safety"></script>
 <script>
@@ -116,10 +122,19 @@ function restoreWorking(){
  }catch{$('saveState').textContent='Рабочий текст не удалось восстановить. Основная база сохранена.'}
 }
 function guard(action){return (...args)=>{const before=state?structuredClone(state):null;try{return action(...args)}catch(e){if(before)state=before;banner(e.message||'Не удалось сохранить. Данные в форме оставлены.')}}}
-function banner(text){$('banner').textContent=text;$('banner').classList.add('on');clearTimeout(banner.t);banner.t=setTimeout(()=>$('banner').classList.remove('on'),15000)}
-let returnFocus=null,chapterEdit=null,topicSeedBusy=false;
-function openModal(id){returnFocus=document.activeElement;$(id).classList.add('on');document.querySelector('.shell').inert=true;$(id).querySelector('input,button,textarea')?.focus()}
-function closeModal(id){if(id==='chapterModal')chapterEdit=null;$(id).classList.remove('on');document.querySelector('.shell').inert=false;returnFocus?.focus()}
+function banner(text){const message=activeModal?$(activeModal).querySelector('.modalMessage'):null;if(message){message.textContent=text;message.scrollIntoView?.({block:'nearest'});}$('banner').textContent=text;$('banner').classList.add('on');clearTimeout(banner.t);banner.t=setTimeout(()=>$('banner').classList.remove('on'),15000)}
+let returnFocus=null,chapterEdit=null,topicSeedBusy=false,activeModal=null,modalBackPending=false;
+function openModal(id){
+ if(modalBackPending)return;
+ returnFocus=document.activeElement;activeModal=id;$(id).classList.add('on');document.querySelector('.shell').inert=true;
+ const message=$(id).querySelector('.modalMessage');if(message)message.textContent='';
+ history.pushState({marketingModal:id},'');
+ $(id).querySelector('.dialog')?.scrollTo?.({top:0});$(id).querySelector('input,button,textarea')?.focus();
+}
+function closeModal(id,updateHistory=true){
+ if(id==='chapterModal')chapterEdit=null;$(id).classList.remove('on');activeModal=null;document.querySelector('.shell').inert=false;returnFocus?.focus({preventScroll:true});
+ if(updateHistory&&history.state?.marketingModal===id){modalBackPending=true;history.back();}
+}
 function currentChapter(){return state.chapters.find(c=>c.id===chapterId)}
 function renderChapters(){
  $('chapters').innerHTML=state.chapters.map(c=>`<button type="button" class="chapter ${c.id===chapterId?'on':''}" data-ch="${esc(c.id)}"><b>${esc(c.title)}</b><small>${esc(c.distinction)}</small></button>`).join('');
@@ -141,7 +156,7 @@ function renderConceptStatuses(){
 }
 function renderChecks(review){
  const normalized=normalizeReview(review);
- $('checks').innerHTML=REVIEW.map(([key,text])=>`<div class="review"><button type="button" data-review="${key}" data-state="${esc(normalized[key])}">${STATES[normalized[key]]}</button><span>${esc(text)}</span></div>`).join('');
+ $('checks').innerHTML=REVIEW.map(([key,text])=>`<div class="review"><button type="button" aria-describedby="review-${key}" data-review="${key}" data-state="${esc(normalized[key])}">${STATES[normalized[key]]}</button><span id="review-${key}">${esc(text)}</span></div>`).join('');
  document.querySelectorAll('[data-review]').forEach(btn=>btn.onclick=()=>{const next={empty:'checked',checked:'signal',signal:'empty'}[btn.dataset.state];btn.dataset.state=next;btn.textContent=STATES[next];updateReviewProgress();saveWorking()});updateReviewProgress();
 }
 function updateReviewProgress(){const done=[...document.querySelectorAll('[data-review]')].filter(x=>x.dataset.state!=='empty').length;$('reviewProgress').textContent='Пройдено '+done+' из '+REVIEW.length+' пунктов'}
@@ -199,10 +214,16 @@ function savePost(status){
 function clearPost(clearDraft=true){
  if(clearDraft===true)writeDraft(null);draftDirty=false;document.querySelectorAll('[data-secondary],[data-concept]').forEach(x=>x.checked=false);editingId=null;['text','addressee','seen','withheld'].forEach(id=>$(id).value='');['toShoulders','toBook','factCleared','quoteConfirmed'].forEach(id=>$(id).checked=false);$('chars').textContent='0';$('cancelEdit').style.display='none';renderChecks();renderSources();renderConceptStatuses();updateQuoteGuard();$('autoSignals').innerHTML='';
 }
-function editPost(id){const p=state.posts.find(x=>x.id===id);if(!p||!['draft','ready'].includes(p.status))return;fillPost(p,id);saveWorking()}
+function hasWorkingPost(){return editingId||['text','addressee','seen','withheld'].some(key=>$(key).value.trim())||document.querySelector('[data-secondary]:checked,[data-concept]:checked,[data-review][data-state="checked"],[data-review][data-state="signal"]')||['toShoulders','toBook','factCleared','quoteConfirmed'].some(key=>$(key).checked)}
+function editPost(id){
+ if(serverBusy)return;checkDraftBase();if(storageBlocked||localStorage.getItem(KEY)!==storageBase)throw Error('База изменилась в другой вкладке. Сохранение приостановлено.');
+ let p=state.posts.find(x=>x.id===id);if(!p||!['draft','ready'].includes(p.status))return;
+ if(hasWorkingPost()){if(!confirm('Сохранить текущий пост как черновик перед открытием поста?'))return;savePost('draft');p=state.posts.find(x=>x.id===id);}
+ fillPost(p,id);saveWorking();$('text').focus({preventScroll:true});$('text').scrollIntoView?.({block:'start'});
+}
 function fillPost(p,id){
  document.querySelectorAll('[data-secondary],[data-concept]').forEach(x=>x.checked=false);$('conceptStatuses').innerHTML='';editingId=id;chapterId=p.sources.primaryChapter;renderAllWorkshop();$('type').value=p.type;$('text').value=p.text;$('addressee').value=p.addressee;$('seen').value=p.trace.seen;$('withheld').value=p.trace.withheld;$('toShoulders').checked=p.leadsToShoulders;$('toBook').checked=p.leadsToBook;$('factCleared').checked=p.factCheckCleared;$('quoteConfirmed').checked=p.sourceQuoteConfirmed;$('chars').textContent=p.text.length;renderChecks(p.review);
- p.sources.secondaryChapters.forEach(id=>{const x=document.querySelector('[data-secondary="'+CSS.escape(id)+'"]');if(x)x.checked=true});p.sources.concepts.forEach(id=>{const x=document.querySelector('[data-concept="'+CSS.escape(id)+'"]');if(x)x.checked=true});renderConceptStatuses();$('centralStatus').value=currentChapter().centralDistinctionStatus;$('cancelEdit').style.display='inline-block';updateQuoteGuard();window.scrollTo({top:0,behavior:'smooth'})
+ p.sources.secondaryChapters.forEach(id=>{const x=document.querySelector('[data-secondary="'+CSS.escape(id)+'"]');if(x)x.checked=true});p.sources.concepts.forEach(id=>{const x=document.querySelector('[data-concept="'+CSS.escape(id)+'"]');if(x)x.checked=true});renderConceptStatuses();$('centralStatus').value=currentChapter().centralDistinctionStatus;$('cancelEdit').style.display='inline-block';updateQuoteGuard();
 }
 function localDate(value){
  const text=String(value);return /^\d{4}-\d{2}-\d{2}$/.test(text)?new Date(text+'T00:00'):new Date(text)
@@ -212,7 +233,7 @@ function localDay(value){
 }
 function renderPosts(){
  const posts=[...state.posts].reverse();$('posts').innerHTML=posts.length?posts.map(p=>{const c=state.chapters.find(x=>x.id===p.sources.primaryChapter),when=p.publishedAt||p.scheduledAt;return `<div class="postrow"><div><b><span class="pill ${p.status}">${STATUS[p.status]}</span> ${esc(c?.title||'')}</b><small>${esc(p.text.slice(0,190)||'без текста')}</small>${when?`<span class="pill">${esc(localDate(when).toLocaleString('ru-RU'))}</span>`:''}${p.status==='published'&&p.publicationUrl&&ChannelSafety.https(p.publicationUrl)?`<a class="pill" href="${esc(p.publicationUrl)}" target="_blank" rel="noopener noreferrer">Открыть публикацию</a>`:''}${p.leadsToShoulders?'<span class="pill">Запись</span>':''}${p.leadsToBook?'<span class="pill">Услуги</span>':''}</div><div class="postactions">${['draft','ready'].includes(p.status)?`<button class="btn" data-edit="${p.id}">Открыть</button>`:''}${p.status!=='draft'? `<button class="btn" data-status="${p.id}">Статус и замеры</button>`:''}</div></div>`}).join(''):'<div class="empty">Постов пока нет.</div>';
- document.querySelectorAll('[data-edit]').forEach(x=>x.onclick=()=>editPost(x.dataset.edit));document.querySelectorAll('[data-status]').forEach(x=>x.onclick=()=>openPostModal(x.dataset.status));
+ document.querySelectorAll('[data-edit]').forEach(x=>x.onclick=guard(()=>editPost(x.dataset.edit)));document.querySelectorAll('[data-status]').forEach(x=>x.onclick=()=>openPostModal(x.dataset.status));
 }
 function renderAllWorkshop(){renderChapters();renderSources();renderConceptStatuses();renderSignal();$('centralStatus').value=currentChapter()?.centralDistinctionStatus||'not_introduced';$('editChapter').disabled=!currentChapter();$('saveReady').disabled=!currentChapter()}
 function recentPublished(days){const max=Date.now(),min=max-days*864e5;return state.posts.filter(p=>p.status==='published'&&p.publishedAt&&new Date(p.publishedAt).getTime()>=min&&new Date(p.publishedAt).getTime()<=max)}
@@ -239,6 +260,7 @@ function renderCalendar(){
 function renderAll(){renderAllWorkshop();renderPosts();renderDashboard();renderCalendar();$('telegramIdentity').value=state.telegramIdentityAccountId||''}
 function newChapter(){return {id:crypto.randomUUID(),title:'',distinction:'',habit:'',reveals:'',images:[],tensions:[],recognition:'',forbidden:'',introduces:[],requires:[],factCheck:true,factNote:'',centralDistinctionStatus:'not_introduced',sourceText:''}}
 function openChapter(adding=false){
+ if(modalBackPending)return;
  if(serverBusy)return banner('Дождитесь завершения сохранения.');
  const c=adding?newChapter():currentChapter();if(!c)return banner('Добавьте тему.');
  chapterEdit={adding,card:structuredClone(c)};
@@ -261,7 +283,7 @@ function switchChapter(id){
  if(id===chapterId||!state.chapters.some(c=>c.id===id))return;
  if(serverBusy)return banner('Дождитесь завершения сохранения.');
  checkDraftBase();if(storageBlocked||localStorage.getItem(KEY)!==storageBase)throw Error('База изменилась в другой вкладке. Сохранение приостановлено.');
- const hasWork=editingId||['text','addressee','seen','withheld'].some(key=>$(key).value.trim())||document.querySelector('[data-secondary]:checked,[data-concept]:checked,[data-review][data-state="checked"],[data-review][data-state="signal"]')||['toShoulders','toBook','factCleared','quoteConfirmed'].some(key=>$(key).checked);
+ const hasWork=hasWorkingPost();
  if(hasWork){if(!confirm('Сохранить текущий пост как черновик перед сменой темы?'))return;savePost('draft');}
  else clearPost();
  chapterId=id;renderAllWorkshop();if(!saveWorking())throw Error('Не удалось сохранить рабочий текст новой темы.');
@@ -281,6 +303,7 @@ async function addTopicSeeds(){
  }catch(error){banner(error.message||'Не удалось добавить темы.')}finally{topicSeedBusy=false;button.disabled=false;}
 }
 function openPostModal(id){
+ if(modalBackPending)return;
  const p=state.posts.find(x=>x.id===id);if(!p)return;statusPostId=id;const m=state.measures.find(x=>x.postId===id)||{};$('postModalTitle').textContent=STATUS[p.status]+' · '+(state.chapters.find(c=>c.id===p.sources.primaryChapter)?.title||'');$('postModalLead').textContent=p.text.slice(0,220);$('statusDate').value=nowLocal(p.publishedAt||p.scheduledAt);$('publicationUrl').value=p.publicationUrl||'';$('subBefore').value=m.subscribersBefore??'';$('subAfter').value=m.subscribersAfter24h??'';$('mShoulders').value=m.shouldersTransitions??'';$('mBook').value=m.bookTransitions??'';$('mSaves').value=m.saves??'';$('mReactions').value=m.reactions??'';$('schedulePost').disabled=p.status==='published';$('saveMeasure').disabled=p.status!=='published';openModal('postModal')
 }
 function scheduleCurrent(){
@@ -315,7 +338,12 @@ function showChannelView(name, updateHistory=true){
 }
 function restoreChannelView(){const name=location.hash.slice(1);showChannelView(channelViews.includes(name)?name:'workshop',false)}
 document.querySelectorAll('[data-view]').forEach(button=>button.onclick=()=>showChannelView(button.dataset.view));
-window.addEventListener('popstate',restoreChannelView);
+window.addEventListener('popstate',()=>{
+ const closing=activeModal,returning=modalBackPending;modalBackPending=false;if(closing)closeModal(closing,false);
+ // Forward must not resurrect an abandoned dialog or its unsaved fields.
+ if(history.state?.marketingModal)history.replaceState(null,'');
+ if(!closing&&!returning)restoreChannelView();
+});
 window.addEventListener('hashchange',restoreChannelView);
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));document.querySelectorAll('.modal').forEach(m=>m.onclick=e=>{if(e.target===m)closeModal(m.id)});
 $('text').oninput=()=>{$('quoteConfirmed').checked=false;$('chars').textContent=$('text').value.length;applySignals()};$('saveDraft').onclick=guard(()=>savePost('draft'));$('saveReady').onclick=guard(()=>savePost('ready'));$('cancelEdit').onclick=guard(()=>clearPost());$('editChapter').onclick=()=>openChapter(false);$('addChapter').onclick=()=>openChapter(true);$('addTopicSeeds').onclick=addTopicSeeds;$('saveChapter').onclick=guard(saveChapter);$('rewriteQuote').onclick=()=>$('text').focus();$('confirmQuote').onclick=()=>{$('quoteGuard').classList.remove('on');$('quoteConfirmed').checked=true;saveWorking();banner('Авторская цитата подтверждена для текущего текста.')};
@@ -329,14 +357,15 @@ $('importFile').onchange=async e=>{try{
  if(!confirm('Импорт заменит базу в этом браузере. Текущая база будет сохранена как предыдущая копия. Продолжить?'))return;
  checkDraftBase();if(storageBlocked||localStorage.getItem(KEY)!==storageBase)throw new Error('База изменилась в другой вкладке. Импорт остановлен.');
  if(storageBase)localStorage.setItem(KEY+'_before_import',storageBase);if(draftBase)localStorage.setItem(DRAFT_KEY+'_before_import',draftBase);
- const next=JSON.stringify(candidate);localStorage.setItem(KEY,next);storageBase=next;state=candidate;storageBlocked=false;chapterId=state.chapters[0].id;clearPost();renderAll();if(candidate.workingDraft){writeDraft(candidate.workingDraft);restoreWorking()}banner('База проверена и импортирована.');
+ const work=candidate.workingDraft?structuredClone(candidate.workingDraft):null;const next=JSON.stringify(candidate);localStorage.setItem(KEY,next);storageBase=next;state=candidate;storageBlocked=false;chapterId=state.chapters[0].id;clearPost();renderAll();if(work){writeDraft(work);restoreWorking()}banner('База проверена и импортирована.');
  }catch(error){banner(error.message||'Не удалось прочитать базу. Текущая база сохранена.')}finally{e.target.value=''}};
 document.querySelectorAll('.field').forEach((field,i)=>{const label=field.querySelector('label'),input=field.querySelector('input,select,textarea');if(label&&input){input.id=input.id||'field-'+i;label.htmlFor=input.id}});
 document.querySelectorAll('.modal').forEach((m,i)=>{const heading=m.querySelector('h2');heading.id=heading.id||'dialog-title-'+i;m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');m.setAttribute('aria-labelledby',heading.id)});
 document.addEventListener('keydown',e=>{const m=document.querySelector('.modal.on');if(!m)return;if(e.key==='Escape')closeModal(m.id);if(e.key==='Tab'){const items=[...m.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea,select')];const first=items[0],last=items.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
+document.querySelector('.skipLink').onclick=e=>{e.preventDefault();showChannelView('workshop');$('text').focus({preventScroll:true});$('text').scrollIntoView?.({block:'start'});};
 document.querySelector('#workshop').addEventListener('input',saveWorking);
 document.querySelector('#workshop').addEventListener('change',saveWorking);
-window.addEventListener('beforeunload',e=>{if(draftDirty){e.preventDefault();e.returnValue=''}});
+window.addEventListener('beforeunload',e=>{if(draftDirty||activeModal){e.preventDefault();e.returnValue=''}});
 window.addEventListener('storage',e=>{if(e.key===KEY||e.key===null){storageBlocked=true;banner('База изменена в другой вкладке. Сохранение приостановлено. Экспортируйте работу перед обновлением.')}if(e.key===DRAFT_KEY||e.key===null){draftBlocked=true;draftDirty=true;banner('Рабочий текст изменён в другой вкладке. Сохранение приостановлено. Скопируйте свой текст перед обновлением.')}});
 
 let serverVersion=null;

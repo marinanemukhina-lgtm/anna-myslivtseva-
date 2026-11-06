@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {renderPublicPage} from '../server/public-pages.mjs';
 import {initialContent} from '../shared/content.mjs';
 const template='<title>Initial</title><div id="root"></div>';
+test('synthetic booking page is reachable and noindex', () => {
+ const page = renderPublicPage(template, '/demo/booking', initialContent);
+ assert.equal(page.status, 200); assert.equal(page.noindex, true);
+ assert.match(page.html, /Только вымышленные данные/);
+});
 test('published content is readable, escaped, and drafts stay private',()=>{
  const raw=structuredClone(initialContent);
  raw.news=[{id:'visible',title:'Visible <script>',body:'Published',published:true},{id:'secret',title:'SECRET',body:'SECRET',published:false}];

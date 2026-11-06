@@ -13,7 +13,7 @@ test('empty cabinet → synthetic card → visit → serializable history', () =
 });
 test('foreign personal fields, invalid dates and orphan visits are rejected', () => {
   const s = exampleClinicalDemo(), v = s.visits[0];
-  for (const invalid of [{...v, phone:'not-permitted'}, {...v,date:'2026-02-30'}, {...v,clientId:id}, {...v,pain:1}, {...v,note:'free text'}]) {
+  for (const invalid of [{...v, phone:'not-permitted'}, {...v,date:'2026-02-30'}, {...v,clientId:id}, {...v,pain:1}, {...v,note:'x'.repeat(4001)}]) {
     assert.equal(clinicalStateSchema.safeParse({...s,visits:[invalid]}).success, false);
   }
   assert.throws(() => addDemoClient(emptyClinicalDemo(), 'Произвольное имя'));
@@ -45,4 +45,12 @@ test('photos are bound to a visit and angle, replace only that pair, and roundtr
  assert.throws(()=>setDemoPhoto(c,{...p,visitId:id}));
  assert.throws(()=>setDemoPhoto(c,{...p,data:'https://example.com/patient.png'}));
  assert.throws(()=>setDemoPhoto(c,{...p,data:'data:image/svg+xml;base64,PHN2Zz4='}));
+});
+
+test('dictated text roundtrips without changing photo or client references', () => {
+ const s=exampleClinicalDemo();
+ const note='Тестовая заметка.\nСинтетическое наблюдение <b>текст</b>.';
+ const next=addDemoVisit(s,{clientId:s.clients[0].id,date:'2026-11-06',procedure:PROCEDURES[0],note});
+ assert.equal(restoreClinicalDemo(JSON.parse(JSON.stringify(next))).visits.at(-1).note,note);
+ assert.deepEqual(next.photos,s.photos); assert.deepEqual(next.clients,s.clients);
 });

@@ -5,7 +5,7 @@ test('service, reserve, confirm, cancel; responsive page and stale/incomplete so
   await page.goto('/booking-demo.html');
   const refresh = page.getByRole('button', { name: 'Обновить свободное время' });
   await expect(refresh).toBeEnabled();
-  await page.getByLabel('Услуга', { exact: true }).selectOption('demo-30');
+  await page.getByRole('combobox', { name: /^Услуга/ }).selectOption('demo-30');
   await refresh.click();
   const slot = page.getByRole('button', { name: '09:00', exact: true });
   await slot.click();
@@ -38,7 +38,7 @@ test('lost reservation response retries the same operation key', async ({ page }
     if (lose) { lose = false; await route.abort(); } else await route.fulfill({ response });
   });
   await page.getByRole('button', { name: 'Зарезервировать на 5 минут' }).click();
-  await expect(page.getByLabel('Услуга', { exact: true })).toBeDisabled();
+  await expect(page.getByRole('combobox', { name: /^Услуга/ })).toBeDisabled();
   await page.getByRole('button', { name: 'Повторить тот же запрос' }).click();
   await expect(page.getByRole('heading', { name: 'Время зарезервировано' })).toBeVisible();
   expect(keys).toHaveLength(2); expect(keys[0]).toBe(keys[1]);

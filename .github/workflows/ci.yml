@@ -18,10 +18,13 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: node scripts/verify-browser-booking.mjs
       - run: npm run test:sites
+      - run: npm run build:booking-demo
       - run: npx playwright install --with-deps chromium webkit
         timeout-minutes: 5
       - run: npm run test:browser
+      - run: npm run test:booking-demo:browser
       - uses: actions/upload-artifact@v4
         if: always()
         with:

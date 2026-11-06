@@ -9,10 +9,11 @@ export function renderPublicPage(template, pathname, raw) {
   const parts = pathname.split('/').filter(Boolean);
   const collection = ['news','offers'].includes(parts[0]) ? data[parts[0]] : null;
   const article = collection && parts.length === 2 ? collection.find(x => x.id === parts[1]) : null;
+  const demo = pathname === '/demo/booking';
   const admin = ['/admin','/admin/setup'].includes(pathname);
-  const known = Object.hasOwn(titles, pathname) || !!article || admin;
+  const known = Object.hasOwn(titles, pathname) || !!article || admin || demo;
   const status = known ? 200 : 404;
-  const title = article?.title || titles[pathname] || (admin ? 'Вход' : 'Страница не найдена');
+  const title = article?.title || titles[pathname] || (demo ? 'Демонстрация записи · Только вымышленные данные' : admin ? 'Вход' : 'Страница не найдена');
   let content = '';
   const paragraphs = values => values.filter(Boolean).map(x => `<p>${escapeHtml(x)}</p>`).join('');
   if (pathname === '/' || pathname === '/about') content = paragraphs([p.name,p.role,p.intro,p.about,p.philosophy,p.approach,p.qualification]);
@@ -21,7 +22,7 @@ export function renderPublicPage(template, pathname, raw) {
   const items = article ? [article] : data[parts[0]];
   if (Array.isArray(items)) content += items.map(x => `<section><h2>${escapeHtml(x.title)}</h2>${paragraphs([x.body,x.price,x.duration,x.issuer,x.year])}${['news','offers'].includes(parts[0]) ? `<a href="/${parts[0]}/${encodeURIComponent(x.id)}">Подробнее</a>` : ''}</section>`).join('');
   const nav = Object.entries(titles).map(([url,label])=>`<a href="${url}">${escapeHtml(label)}</a>`).join(' · ');
-  const noindex = !known || admin;
+  const noindex = !known || admin || demo;
   const head = `<title>${escapeHtml(title)}</title>${noindex ? '<meta name="robots" content="noindex, nofollow">' : `<link rel="canonical" href="${origin}${escapeHtml(pathname)}">`}`;
   const html = template.replace(/<title>[\s\S]*?<\/title>/, head).replace('<div id="root"></div>', `<div id="root"><main><h1>${escapeHtml(title)}</h1>${content}<nav>${nav}</nav></main></div>`);
   return {html,status,noindex};

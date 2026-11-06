@@ -261,12 +261,13 @@ test('materials show prepared copy, editorial plan and saved social links withou
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.getByRole('link',{name:'Заполнить ссылки на соцсети'}).click();
   await expect(page.getByRole('heading',{name:'Соцсети Анны',exact:true})).toBeVisible();
-  await page.getByLabel('Telegram · ссылка',{exact:true}).fill('https://t.me/synthetic_test_only');
+  await page.getByRole('textbox',{name:/^Telegram · ссылка/}).fill('https://t.me/synthetic_test_only');
   const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/admin/content' && r.request().method()==='PUT');
   await page.getByRole('button',{name:'Сохранить изменения',exact:true}).click();
   expect((await saved).status()).toBe(200);
+  await expect(page.getByRole('button',{name:'Сохранить изменения',exact:true})).toBeDisabled();
   await page.reload();
-  await expect(page.getByLabel('Telegram · ссылка',{exact:true})).toHaveValue('https://t.me/synthetic_test_only');
+  await expect(page.getByRole('textbox',{name:/^Telegram · ссылка/})).toHaveValue('https://t.me/synthetic_test_only');
   await page.getByRole('link',{name:'Маркетинг и прогрев',exact:true}).click();
   await page.getByRole('button',{name:'Материалы и план',exact:true}).click();
   await expect(page.locator('#annaSocials')).toContainText('https://t.me/synthetic_test_only');

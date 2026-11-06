@@ -13,7 +13,8 @@ export function renderPublicPage(template, pathname, raw) {
   const admin = ['/admin','/admin/setup'].includes(pathname);
   const known = Object.hasOwn(titles, pathname) || !!article || admin || demo;
   const status = known ? 200 : 404;
-  const title = article?.title || titles[pathname] || (demo ? 'Демонстрация записи · Только вымышленные данные' : admin ? 'Вход' : 'Страница не найдена');
+  const patientDemo = ['/admin/patients', '/demo/patients'].includes(pathname);
+  const title = (patientDemo ? 'Пациенты и истории · Фото до и после' : '') || article?.title || titles[pathname] || (demo ? 'Демонстрация записи · Только вымышленные данные' : admin ? 'Вход' : 'Страница не найдена');
   let content = '';
   const paragraphs = values => values.filter(Boolean).map(x => `<p>${escapeHtml(x)}</p>`).join('');
   if (pathname === '/' || pathname === '/about') content = paragraphs([p.name,p.role,p.intro,p.about,p.philosophy,p.approach,p.qualification]);

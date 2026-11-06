@@ -125,6 +125,7 @@ function guard(action){return (...args)=>{const before=state?structuredClone(sta
 function banner(text){const message=activeModal?$(activeModal).querySelector('.modalMessage'):null;if(message){message.textContent=text;message.scrollIntoView?.({block:'nearest'});}$('banner').textContent=text;$('banner').classList.add('on');clearTimeout(banner.t);banner.t=setTimeout(()=>$('banner').classList.remove('on'),15000)}
 let returnFocus=null,chapterEdit=null,topicSeedBusy=false,activeModal=null,modalBackPending=false;
 function openModal(id){
+ if(modalBackPending)return;
  returnFocus=document.activeElement;activeModal=id;$(id).classList.add('on');document.querySelector('.shell').inert=true;
  const message=$(id).querySelector('.modalMessage');if(message)message.textContent='';
  history.pushState({marketingModal:id},'');
@@ -259,6 +260,7 @@ function renderCalendar(){
 function renderAll(){renderAllWorkshop();renderPosts();renderDashboard();renderCalendar();$('telegramIdentity').value=state.telegramIdentityAccountId||''}
 function newChapter(){return {id:crypto.randomUUID(),title:'',distinction:'',habit:'',reveals:'',images:[],tensions:[],recognition:'',forbidden:'',introduces:[],requires:[],factCheck:true,factNote:'',centralDistinctionStatus:'not_introduced',sourceText:''}}
 function openChapter(adding=false){
+ if(modalBackPending)return;
  if(serverBusy)return banner('Дождитесь завершения сохранения.');
  const c=adding?newChapter():currentChapter();if(!c)return banner('Добавьте тему.');
  chapterEdit={adding,card:structuredClone(c)};
@@ -301,6 +303,7 @@ async function addTopicSeeds(){
  }catch(error){banner(error.message||'Не удалось добавить темы.')}finally{topicSeedBusy=false;button.disabled=false;}
 }
 function openPostModal(id){
+ if(modalBackPending)return;
  const p=state.posts.find(x=>x.id===id);if(!p)return;statusPostId=id;const m=state.measures.find(x=>x.postId===id)||{};$('postModalTitle').textContent=STATUS[p.status]+' · '+(state.chapters.find(c=>c.id===p.sources.primaryChapter)?.title||'');$('postModalLead').textContent=p.text.slice(0,220);$('statusDate').value=nowLocal(p.publishedAt||p.scheduledAt);$('publicationUrl').value=p.publicationUrl||'';$('subBefore').value=m.subscribersBefore??'';$('subAfter').value=m.subscribersAfter24h??'';$('mShoulders').value=m.shouldersTransitions??'';$('mBook').value=m.bookTransitions??'';$('mSaves').value=m.saves??'';$('mReactions').value=m.reactions??'';$('schedulePost').disabled=p.status==='published';$('saveMeasure').disabled=p.status!=='published';openModal('postModal')
 }
 function scheduleCurrent(){

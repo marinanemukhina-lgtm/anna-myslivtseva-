@@ -145,3 +145,21 @@ test('opening a saved post preserves unfinished work as a separate draft after a
  h.run("editPost('saved-post')");assert.equal(h.run('state.posts.length'),2);assert.equal(h.run('state.posts[1].text'),'Unfinished new text');
  assert.equal(h.element('text').value,'Saved post');assert.equal(h.run('editingId'),'saved-post');
 });
+
+test('immediate modal reopen waits for the preceding asynchronous Back to finish',async()=>{
+ const data=withDraft();data.posts=[{...structuredClone(data.workingDraft.post),id:'saved-post',status:'ready'}];
+ const h=harness({data});await h.ready;const calls=[];
+ h.context.history={state:null,pushState(value){this.state=value;calls.push('push')},replaceState(value){this.state=value;calls.push('replace')},back(){calls.push('back')}};
+ const before=[h.storage.get(KEY),h.storage.get(DRAFT_KEY)];
+ h.run("openChapter(true);closeModal('chapterModal')");
+ assert.equal(h.run('modalBackPending'),true);assert.equal(h.run('chapterEdit'),null);
+ h.run("openChapter(true);openPostModal('saved-post');openModal('chapterModal')");
+ assert.equal(h.run('activeModal'),null);assert.equal(h.run('chapterEdit'),null);assert.equal(h.run('statusPostId'),null);
+ assert.equal(h.element('.shell').inert,false);assert.deepEqual(calls,['push','back']);
+ h.context.history.state=null;h.listeners.get('popstate')();
+ assert.equal(h.run('modalBackPending'),false);
+ h.run("openPostModal('saved-post')");
+ assert.equal(h.run('activeModal'),'postModal');assert.equal(h.run('statusPostId'),'saved-post');
+ assert.equal(h.element('.shell').inert,true);assert.deepEqual(calls,['push','back','push']);
+ assert.deepEqual([h.storage.get(KEY),h.storage.get(DRAFT_KEY)],before);
+});

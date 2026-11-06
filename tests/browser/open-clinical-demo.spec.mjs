@@ -1,0 +1,20 @@
+import { test, expect } from '@playwright/test';
+test('open patient histories require no password, persist locally, and can start empty', async ({ page }) => {
+  const writes = []; page.on('request', r => { if (r.method()==='POST') writes.push(r.url()); });
+  await page.goto('/admin/patients');
+  await expect(page.getByRole('heading',{name:'Пациенты и истории'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Демо-клиент 001',exact:true})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'История процедур'})).toBeVisible();
+  await expect(page.locator('.clinical-visit')).toHaveCount(3);
+  await page.getByRole('button',{name:'Сохранить процедуру'}).click();
+  await expect(page.locator('.clinical-visit')).toHaveCount(4);
+  await page.reload(); await expect(page.locator('.clinical-visit')).toHaveCount(4);
+  await page.screenshot({path:`.qa/clinical-${test.info().project.name}.png`,fullPage:true});
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button',{name:'Начать с пустого кабинета'}).click();
+  await expect(page.getByRole('heading',{name:'Начните с тестовой карты'})).toBeVisible();
+  await page.getByRole('button',{name:'Создать Демо-клиент 001'}).click();
+  await expect(page.getByText('Пока нет процедур.',{exact:true})).toBeVisible();
+  expect(writes).toEqual([]);
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});

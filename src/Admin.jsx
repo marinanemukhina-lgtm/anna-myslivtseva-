@@ -424,6 +424,7 @@ export default function Admin() {
           ))}
         </nav>
         <div className="admin-sidebar-bottom">
+          <a href="/admin/patients">Пациенты и истории · демо</a>
           <a href="/demo/booking" target="_blank" rel="noreferrer">Демо онлайн-записи</a>
           {!contentOnlyAccess && <a href="/admin/marketing">Маркетинг и прогрев</a>}
           <a href="/" target="_blank" rel="noreferrer">

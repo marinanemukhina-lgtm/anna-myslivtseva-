@@ -74,7 +74,7 @@ export function Demo({ transport = 'http' }) {
   }
   const active = ['pending','confirmed'].includes(receipt?.status);
   return <main>
-    <header><a href="/">Анна Мысливцева</a><a href="/admin">Админка</a><span>Публичная запись выключена</span></header>
+    <header><a href="/">Анна Мысливцева</a><a href="/admin">Админка</a><a href="/admin/patients">Истории · демо</a></header>
     <div className="demo-intro"><h1>Проверяем запись</h1><p>Только вымышленные клиенты и услуги. Эта демонстрация не создаёт настоящий приём.</p></div>
     <section className="demo-workspace" aria-label="Демонстрация записи">
       <div className="demo-controls">

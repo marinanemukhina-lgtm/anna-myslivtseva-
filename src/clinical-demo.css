@@ -1,0 +1,57 @@
+.clinical-root,.clinical-booking{font-family:Inter,Arial,sans-serif;color:#253650}
+.clinical-root{display:grid;gap:24px}
+.clinical-banner{padding:18px 22px;border:1px solid #d6dfe0;background:#eef3f2;font-size:13px;line-height:1.65}
+.clinical-banner strong{font-weight:700}.clinical-banner p{margin:6px 0 0}
+.clinical-actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.clinical-secondary{border:1px solid #9ba9b7;padding:12px 16px;font-size:12px;min-height:44px;display:inline-flex;align-items:center}
+.clinical-grid{display:grid;grid-template-columns:200px minmax(0,1fr);align-items:start;gap:20px}
+.clinical-people{background:#fff;border:1px solid #e0e2e5;padding:20px;display:grid;gap:8px}
+.clinical-people h2,.clinical-card h2{font-size:25px;margin-bottom:10px}
+.clinical-people button{padding:12px;text-align:left;border:1px solid #d9e0e6;font-size:12px}
+.clinical-people button.active{background:#253650;color:white}
+.clinical-main{min-width:0}
+.clinical-card{padding:24px;border:1px solid #dfe4e7;background:white;margin-bottom:20px}
+.clinical-card h2{font-family:var(--serif),Georgia,serif;font-size:36px}
+.clinical-card h3{font-size:18px;margin:16px 0}
+.clinical-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#657683}
+.clinical-hint{font-size:12px;line-height:1.6;color:#657683;margin:12px 0}
+.clinical-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:22px 0 28px}
+.clinical-metrics>div{border-top:1px solid #dbe1e4;padding:14px 4px}
+.clinical-metrics strong{display:block;font-size:25px;font-variant-numeric:tabular-nums}
+.clinical-metrics span{display:block;font-size:11px;line-height:1.45;color:#657683}
+.clinical-chart svg{width:100%;max-width:700px;height:auto}
+.clinical-chart-legend{display:flex;gap:22px;flex-wrap:wrap;font-size:12px;margin:12px 0}
+.clinical-pain{color:#bd755f}.clinical-mobility{color:#457e79}
+.clinical-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.clinical-form label{display:grid;gap:8px;font-size:12px}
+.clinical-form input,.clinical-form select,.clinical-request select{padding:12px;min-height:44px;border:1px solid #cbd3db;width:100%;min-width:0;border-radius:2px;background:#fff;color:#253650}
+.clinical-form input[type=range]{padding:0;accent-color:#457e79}
+.clinical-form .admin-primary{align-self:end}
+.clinical-visit{padding:18px 0;border-top:1px solid #dce2e8}
+.clinical-visit>div:first-child{display:flex;gap:14px;flex-wrap:wrap}
+.clinical-visit p{font-size:13px;margin:10px 0}
+.clinical-photo-button{display:inline-block;font-size:12px;text-decoration:underline;cursor:pointer;padding:10px 0}
+.clinical-photo-button input{position:absolute;width:1px;height:1px;opacity:0}
+.clinical-photo-button:focus-within{outline:2px solid #253650}
+.clinical-photos{display:flex;gap:9px;flex-wrap:wrap}
+.clinical-photos img{width:110px;height:110px;object-fit:cover}
+.clinical-request{display:flex;justify-content:space-between;gap:18px;padding:14px 0;border-top:1px solid #dce2e8;font-size:12px;align-items:center}
+.clinical-request p{margin:6px 0;color:#657683}
+.clinical-request label{display:flex;align-items:center;gap:9px}
+.clinical-notice,.clinical-error{font-size:13px;padding:14px 18px;line-height:1.5}
+.clinical-notice{background:#e6f0ed;color:#2d6458}
+.clinical-error{background:#f8eaea;color:#912e37}
+.clinical-booking{max-width:1100px;margin:0 auto;padding:clamp(40px,6vw,110px) var(--gutter,30px)}
+.clinical-booking h1{font-family:var(--serif),Georgia,serif;font-weight:400;font-size:clamp(54px,8vw,116px);line-height:1.08;margin:16px 0 28px}
+.clinical-lead{max-width:610px;font-size:17px;line-height:1.8;margin-bottom:46px}
+.clinical-booking .clinical-form{max-width:700px}
+.clinical-slots{grid-column:1/-1;border:0;padding:16px 0}
+.clinical-slots legend{font-size:13px;margin-bottom:15px}
+.clinical-slots>div{display:flex;gap:10px;flex-wrap:wrap}
+.clinical-slots button{min-width:76px;min-height:44px;border:1px solid #aeb9c1;font-size:14px}
+.clinical-slots button.chosen{background:#253650;color:#fff;border-color:#253650}
+.clinical-booking>p:last-child{margin-top:34px;text-decoration:underline;font-size:13px}
+@media(max-width:850px){.clinical-grid{grid-template-columns:1fr}.clinical-people{display:flex;align-items:center;flex-wrap:wrap}.clinical-people h2{width:100%}.clinical-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.clinical-card{padding:18px}.clinical-form{grid-template-columns:1fr}.clinical-request{align-items:stretch;flex-direction:column}.clinical-people button{flex:1 0 auto}.clinical-actions .admin-primary{width:auto}}
+
+.clinical-shell{max-width:1240px;margin:auto;padding:32px clamp(20px,4vw,56px);color:#253650;font-family:Inter,Arial,sans-serif;background:#fffcf8;min-height:100vh}.clinical-shell h1{font-family:var(--serif),Georgia,serif;font-size:clamp(42px,5vw,68px);font-weight:500;line-height:1.15;margin:32px 0 18px}.clinical-nav{display:flex;gap:26px;flex-wrap:wrap;border-bottom:1px solid #d5d2cd;padding-bottom:20px}.clinical-shell .clinical-lead{margin-bottom:22px}.clinical-shell .clinical-actions{margin-top:24px}.clinical-shell .clinical-hint,.clinical-shell .clinical-metrics span{font-size:14px;color:#48576b}.clinical-shell .clinical-form label,.clinical-shell .clinical-secondary,.clinical-shell .clinical-people button,.clinical-shell .clinical-visit p{font-size:15px}.clinical-shell .admin-primary{padding:12px 18px;min-height:46px;background:#253650;color:white;border:1px solid #253650}.clinical-shell button:focus-visible,.clinical-shell a:focus-visible{outline:3px solid #395c9c;outline-offset:3px}.clinical-status{min-height:26px}.clinical-shell button:hover{filter:brightness(.94)}.clinical-shell .clinical-pain{color:#994b34}.clinical-shell .clinical-mobility{color:#326963}.clinical-shell .clinical-banner{font-size:15px}.clinical-shell input,.clinical-shell select{font:inherit}.clinical-shell .clinical-form{align-items:start}.clinical-shell .clinical-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}

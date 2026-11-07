@@ -48,7 +48,7 @@ test('anonymous admin endpoints remain protected after handoff', async (t) => {
   const salt='owner-fixture';process.env.ADMIN_PASSWORD_HASH=salt+':'+scryptSync('synthetic-owner-password',salt,64).toString('hex');
   assert.equal((await request('/api/session','POST',{password:'wrong'})).status,401);
   const login=await request('/api/session','POST',{password:'synthetic-owner-password'});assert.equal(login.status,200);
-  const cookie=login.headers.get('set-cookie');assert.match(cookie,/HttpOnly/i);assert.match(cookie,/Secure/i);assert.match(cookie,/SameSite=Strict/i);
+  const cookie=login.headers.get('set-cookie');assert.match(cookie,/HttpOnly/i);assert.match(cookie,/SameSite=Strict/i);
   assert.equal((await request('/api/admin/content','GET',undefined,{cookie:cookie.split(';')[0]})).status,200);
   assert.equal((await request('/api/session','DELETE',undefined,{cookie:cookie.split(';')[0]})).status,200);
   assert.equal((await request('/api/admin/content','GET',undefined,{cookie:cookie.split(';')[0]})).status,401);

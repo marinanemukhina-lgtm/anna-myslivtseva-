@@ -51,7 +51,7 @@ test('private occupancy requires login, preview confirmation and protects CMS wi
  delete process.env.VERCEL;delete process.env.VERCEL_ENV;
  const again=await req('/api/session','POST',{password:'synthetic-private-password'});cookie=again.headers.get('set-cookie').split(';')[0];
  state=await(await req('/api/admin/booking/occupancy')).json();assert.equal(state.occupancy.records.length,1);assert.equal(state.version,privateVersion);
- assert.equal((await req(`/api/admin/booking/records/${applied.records[0].id}/cancel`,'POST',{expectedVersion:privateVersion})).status,409);
+ assert.equal((await req(`/api/admin/booking/records/${applied.records[0].id}/cancel`,'POST',{expectedVersion:privateVersion-1})).status,409);
  response=await req(`/api/admin/booking/records/${applied.records[0].id}/cancel`,'POST',{expectedVersion:state.version});assert.equal(response.status,200);assert.equal((await response.json()).records[0].status,'cancelled');
  assert.equal((await req('/api/booking/appointments','POST',{name:'synthetic'})).status,503);
  assert.equal((await(await req('/api/booking/config')).json()).ready,false);

@@ -43,7 +43,8 @@
   "git": {
     "deploymentEnabled": {
       "prep/anonymous-busy-windows-20261105": false,
-      "prep/synthetic-unified-booking-20261106": false
+      "prep/synthetic-unified-booking-20261106": false,
+      "fix/anna-clinical-reliability-20261107": false
     }
   }
 }

@@ -6,7 +6,7 @@ import path from 'node:path';
 import {scryptSync} from 'node:crypto';
 import http from 'node:http';
 
-test('private occupancy requires login, preview confirmation and preserves privacy in open content CMS',async t=>{
+test('private occupancy requires login, preview confirmation and protects CMS without anonymous access',async t=>{
  const dir=await mkdtemp(path.join(tmpdir(),'anna-private-occupancy-'));process.env.DATA_DIR=dir;
  delete process.env.VERCEL;delete process.env.VERCEL_ENV;delete process.env.DATABASE_URL;
  process.env.ADMIN_PASSWORD_HASH='fixture:'+scryptSync('synthetic-private-password','fixture',64).toString('hex');
@@ -42,17 +42,15 @@ test('private occupancy requires login, preview confirmation and preserves priva
  state=await(await req('/api/admin/booking/occupancy')).json();assert.equal(state.occupancy.records.length,1);
  const privateVersion=state.version;
  assert.equal((await(await req('/api/content')).json()).bookingOccupancy,undefined);
- // The deliberately public CMS must not expose or modify private occupancy.
+ // Anonymous content access must remain closed even when the request uses the production host.
  process.env.VERCEL='1';process.env.VERCEL_ENV='production';cookie='';
  const headers={host:'anna-myslivtseva.vercel.app',origin:'https://anna-myslivtseva.vercel.app'};
- response=await req('/api/admin/content','GET',undefined,headers);assert.equal(response.status,200);let content=await response.json();assert.equal(content.data.bookingOccupancy,undefined);
+ response=await req('/api/admin/content','GET',undefined,headers);assert.equal(response.status,401);
  assert.equal((await req('/api/admin/booking/occupancy','GET',undefined,headers)).status,401);
- assert.equal((await req('/api/admin/content','PUT',{...content,version:content.version+1},headers)).status,409);
- content.data.bookingOccupancy={schemaVersion:1,coverage:null,records:[]};content.data.profile.about='Synthetic public change';
- response=await req('/api/admin/content','PUT',content,headers);assert.equal(response.status,200);assert.equal((await response.json()).data.bookingOccupancy,undefined);
+ assert.equal((await req('/api/admin/content','PUT',{},headers)).status,401);
  delete process.env.VERCEL;delete process.env.VERCEL_ENV;
  const again=await req('/api/session','POST',{password:'synthetic-private-password'});cookie=again.headers.get('set-cookie').split(';')[0];
- state=await(await req('/api/admin/booking/occupancy')).json();assert.equal(state.occupancy.records.length,1);assert.ok(state.version>privateVersion);
+ state=await(await req('/api/admin/booking/occupancy')).json();assert.equal(state.occupancy.records.length,1);assert.equal(state.version,privateVersion);
  assert.equal((await req(`/api/admin/booking/records/${applied.records[0].id}/cancel`,'POST',{expectedVersion:privateVersion})).status,409);
  response=await req(`/api/admin/booking/records/${applied.records[0].id}/cancel`,'POST',{expectedVersion:state.version});assert.equal(response.status,200);assert.equal((await response.json()).records[0].status,'cancelled');
  assert.equal((await req('/api/booking/appointments','POST',{name:'synthetic'})).status,503);

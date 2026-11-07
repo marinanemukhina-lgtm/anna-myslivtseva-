@@ -21,10 +21,17 @@ export default function VoiceNote({ value, onChange, disabled, onBusy }) {
 
   function finish(recognition, message) {
     if (session.current?.recognition !== recognition) return;
-    clearTimeout(session.current.timer);
+    const current = session.current;
+    clearTimeout(current.timer);
     session.current = null;
     recognition.onstart = recognition.onresult = recognition.onerror = recognition.onend = null;
     try { recognition.abort(); } catch { /* Some engines have already ended. */ }
+    if (current.draft) {
+      // An unconfirmed fragment must remain reviewable rather than vanish.
+      const text=[current.base,current.confirmed,current.draft].filter(Boolean).join(' ').slice(0,LIMIT);
+      onChange(text);
+      message += ' Неподтверждённые слова оставлены в поле как черновик — проверьте их.';
+    }
     setPhase('idle'); setInterim(''); onBusy(false); setStatus(message);
   }
 
@@ -53,12 +60,13 @@ export default function VoiceNote({ value, onChange, disabled, onBusy }) {
       const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       recognition = new Recognition();
       const base = value.trimEnd();
-      session.current = { recognition, timer: null };
+      session.current = { recognition, timer: null, base, confirmed: '', draft: '' };
       recognition.lang = 'ru-RU';
       recognition.continuous = true;
       recognition.interimResults = true;
       recognition.onstart = () => {
         if (session.current?.recognition !== recognition) return;
+        clearTimeout(session.current.timer);session.current.timer=null;
         if (!session.current.stopping) { setPhase('listening'); setStatus('Слушаю… Говорите по-русски.'); }
       };
       recognition.onresult = event => {
@@ -69,6 +77,8 @@ export default function VoiceNote({ value, onChange, disabled, onBusy }) {
           const result = event.results[i];
           (result.isFinal ? final : draft).push(result[0].transcript.trim());
         }
+        session.current.confirmed=final.join(' ');
+        session.current.draft=draft.join(' ');
         const text = [base, ...final].filter(Boolean).join(' ');
         onChange(text.slice(0, LIMIT));
         setInterim(draft.join(' ').slice(0, LIMIT));
@@ -77,6 +87,7 @@ export default function VoiceNote({ value, onChange, disabled, onBusy }) {
       recognition.onerror = event => finish(recognition, errors[event.error] || 'Диктовка прервана. Уже распознанный текст сохранён в поле.');
       recognition.onend = () => finish(recognition, 'Диктовка завершена. Проверьте текст и сохраните процедуру.');
       setPhase('starting'); setInterim(''); setStatus('Ожидаю доступ к микрофону…'); onBusy(true);
+      session.current.timer=setTimeout(()=>finish(recognition,'Микрофон не ответил. Используйте микрофон клавиатуры iPhone.'),10000);
       recognition.start();
     } catch {
       if (recognition && session.current) finish(recognition, 'Не удалось начать диктовку. Используйте микрофон клавиатуры телефона или повторите попытку.');

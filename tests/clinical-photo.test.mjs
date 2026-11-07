@@ -1,0 +1,12 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {encodeClinicalPhoto,MAX_PHOTO_DATA_LENGTH} from '../src/clinical-photo.mjs';
+const url=size=>'data:image/jpeg;base64,'+'A'.repeat(size-23);
+const fixture=encoding=>{const calls=[];const canvas={width:0,height:0,getContext:()=>({fillRect(){},drawImage(){}}),toDataURL(type,quality){calls.push({width:this.width,height:this.height,quality});assert.equal(type,'image/jpeg');return encoding(this,quality);}};return{canvas,calls,create:()=>canvas};};
+test('small images are not enlarged and canvas is released',()=>{const f=fixture(()=>url(100));assert.equal(encodeClinicalPhoto({naturalWidth:32,naturalHeight:16},f.create),url(100));assert.deepEqual(f.calls,[{width:32,height:16,quality:.85}]);assert.equal(f.canvas.width,0);});
+test('oversized image is retried at a reduced scale',()=>{const f=fixture(c=>url(c.width>1280?1649559:900000));assert.ok(encodeClinicalPhoto({naturalWidth:1600,naturalHeight:1600},f.create).length<=MAX_PHOTO_DATA_LENGTH);assert.equal(f.calls.length,5);assert.equal(f.calls.at(-1).width,1280);});
+test('portrait images maintain aspect ratio',()=>{const f=fixture(()=>url(100));encodeClinicalPhoto({naturalWidth:3000,naturalHeight:6000},f.create);assert.equal(f.calls[0].width,800);assert.equal(f.calls[0].height,1600);});
+test('invalid dimensions fail before allocating a bitmap',()=>{for(const x of [undefined,0,NaN,-1,Infinity])assert.throws(()=>encodeClinicalPhoto({naturalWidth:x,naturalHeight:10},()=>assert.fail('bitmap allocated')),/PHOTO_DECODE_FAILED/);});
+test('invalid output is rejected safely',()=>{for(const value of [null,'data:,','data:image/png;base64,AAAA','data:image/jpeg;base64,']){const f=fixture(()=>value);assert.throws(()=>encodeClinicalPhoto({naturalWidth:50,naturalHeight:50},f.create),/PHOTO_ENCODING_FAILED/);assert.equal(f.canvas.width,0);}});
+test('bounded retries refuse an image that cannot fit',()=>{const f=fixture(()=>url(1500000));assert.throws(()=>encodeClinicalPhoto({naturalWidth:1600,naturalHeight:1600},f.create),/PHOTO_TOO_LARGE/);assert.equal(f.calls.length,20);assert.equal(f.canvas.width,0);});
+test('null context fails clearly',()=>{assert.throws(()=>encodeClinicalPhoto({naturalWidth:10,naturalHeight:10},()=>({getContext:()=>null,width:10,height:10})),/PHOTO_ENCODING_FAILED/);});

@@ -100,3 +100,20 @@ test('without recognition, keyboard notes remain editable and persist', async ({
   await page.reload();
   await expect(page.locator('.clinical-visit').first()).toContainText('Тест с клавиатуры.');
 });
+
+test('interim-only speech remains editable after dictation ends and can be saved',async ({page})=>{
+  await mockSpeech(page);
+  await page.goto('/admin/patients');
+  const field=page.getByRole('textbox',{name:'Заметка к посещению'});
+  await page.getByRole('button',{name:'Надиктовать',exact:true}).click();
+  await page.evaluate(()=>speechSessions[0].result([['Синтетический незавершённый текст',false]]));
+  await expect(page.getByText(/Распознаётся: Синтетический незавершённый текст/)).toBeVisible();
+  await page.getByRole('button',{name:'Остановить диктовку'}).click();
+  await page.evaluate(()=>speechSessions[0].onend?.());
+  await expect(field).toHaveValue('Синтетический незавершённый текст');
+  await expect(page.getByText(/Неподтверждённые слова оставлены в поле/)).toBeVisible();
+  await field.fill('Исправленный синтетический текст.');
+  await page.getByRole('button',{name:'Сохранить процедуру'}).click();
+  await page.reload();
+  await expect(page.locator('.clinical-visit').first()).toContainText('Исправленный синтетический текст.');
+});

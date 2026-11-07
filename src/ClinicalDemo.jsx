@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { PERSONAS, PROCEDURES, ANGLES, restoreClinicalDemo, emptyClinicalDemo, exampleClinicalDemo, addDemoClient, addDemoVisit, setDemoPhoto } from '../shared/clinical-demo.mjs';
 import './clinical-demo.css';
 import VoiceNote from './VoiceNote.jsx';
+import { encodeClinicalPhoto } from './clinical-photo.mjs';
 const STORAGE = 'anna-open-synthetic-clinical-v1';
 function initial() {
   try { const saved = localStorage.getItem(STORAGE); return saved ? restoreClinicalDemo(JSON.parse(saved)) : exampleClinicalDemo(); }
@@ -12,7 +13,7 @@ function PhotoPanel({ label, visit, visits, angle, photo, busy, onSelect, onPhot
     <div className="clinical-photo-title"><h3>{label}</h3><label>{label}: посещение<select value={visit?.id ?? ''} disabled={busy || !visits.length} onChange={e=>onSelect(e.target.value)}>{!visits.length && <option value="">Нет посещений</option>}{visits.map(v=><option key={v.id} value={v.id}>{v.date} · {v.procedure}</option>)}</select></label></div>
     <div className="clinical-photo-frame">{photo ? <img src={photo.data} alt={`Фото ${label.toLowerCase()} · ${angle} · ${visit.date}`}/> : <p>Фото пока не добавлено<span>{angle} · {visit?.date ?? 'Добавьте посещение'}</span></p>}</div>
     <label className={'clinical-photo-upload clinical-camera-button' + (busy || !visit ? ' disabled' : '')}>Снять фото «{label}»<input type="file" accept="image/*" capture="environment" aria-label={`Снять фото ${label}`} disabled={busy || !visit} onChange={e=>onPhoto(e,visit.id,angle)}/></label>
-    <label className={'clinical-photo-upload' + (busy || !visit ? ' disabled' : '')}>{photo ? 'Заменить' : 'Добавить'} фото «{label}»<input type="file" accept="image/jpeg,image/png,image/webp" aria-label={`Добавить фото ${label}`} disabled={busy || !visit} onChange={e=>onPhoto(e,visit.id,angle)}/></label>
+    <label className={'clinical-photo-upload' + (busy || !visit ? ' disabled' : '')}>{photo ? 'Заменить' : 'Добавить'} фото «{label}»<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" aria-label={`Добавить фото ${label}`} disabled={busy || !visit} onChange={e=>onPhoto(e,visit.id,angle)}/></label>
   </div>;
 }
 export default function ClinicalDemo() {
@@ -29,7 +30,7 @@ export default function ClinicalDemo() {
   const unused = PERSONAS.filter(p => !state.clients.some(c => c.label === p));
   function save(next, notice) {
     try { localStorage.setItem(STORAGE, JSON.stringify(next)); }
-    catch { setMessage('Не удалось сохранить: память браузера заполнена или недоступна. Скачайте текущие истории. Новое изменение не применено.'); return false; }
+    catch { setMessage('Не удалось сохранить в хранилище браузера. Старое фото осталось без изменений. Скачайте тестовые истории или освободите место кнопкой «Начать с пустого кабинета».'); return false; }
     setState(next); setMessage(notice + ' Сохранено в этом браузере.'); return true;
   }
   function choose(id) { setSelected(id);setBeforeId('');setAfterId('');setMessage(''); }
@@ -50,12 +51,10 @@ export default function ClinicalDemo() {
     try {
       const raw=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error());reader.readAsDataURL(file);});
       const img=await new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(Error());image.src=raw;});
-      const scale=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));
-      const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
-      const ctx=canvas.getContext('2d');ctx.fillStyle='#ffffff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
-      let data=canvas.toDataURL('image/jpeg',0.85);if(data.length>1400000)data=canvas.toDataURL('image/jpeg',0.65);
-      save(setDemoPhoto(state,{visitId,angle:photoAngle,data}), 'Тестовое фото добавлено.');
-    } catch {setMessage('Не удалось обработать изображение. Попробуйте снять фото ещё раз или выбрать JPG / PNG из галереи.');}
+      const data=encodeClinicalPhoto(img);
+      const replacing=state.photos.some(p=>p.visitId===visitId && p.angle===photoAngle);
+      save(setDemoPhoto(state,{visitId,angle:photoAngle,data}), replacing ? 'Тестовое фото заменено.' : 'Тестовое фото добавлено.');
+    } catch (error) {setMessage(error?.message==='PHOTO_TOO_LARGE' ? 'Не удалось уменьшить фото до допустимого размера. Старое фото сохранено. Выберите другой снимок.' : 'Не удалось обработать изображение. Старое фото сохранено. Попробуйте снять фото ещё раз или выбрать JPG / PNG из галереи.');}
     finally {setBusy(false);}
   }
   function example() { const next=exampleClinicalDemo();if(save(next,'Пример восстановлен.')){setSelected(next.clients[0].id);setBeforeId('');setAfterId('');} }

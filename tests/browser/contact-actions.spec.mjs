@@ -10,6 +10,24 @@ async function publishedPhone(page, phone) {
   });
 }
 
+async function gotoWithPublishedContent(page, url, phone) {
+  // `load` can precede React's first effect. Wait for that page's actual content
+  // request before leaving it, rather than navigating away from a starting app.
+  // Register before goto so even a fast intercepted response cannot be missed.
+  const pathname = new URL(url, 'http://fixture.invalid').pathname.replace(/\/$/, '') || '/';
+  const content = page.waitForResponse(response => {
+    const request = response.request();
+    const referer = request.headers().referer;
+    return new URL(response.url()).pathname === '/api/content' && request.method() === 'GET'
+      && Boolean(referer) && (new URL(referer).pathname.replace(/\/$/, '') || '/') === pathname;
+  });
+  await page.goto(url);
+  const response = await content;
+  expect(response.status()).toBe(200);
+  expect(await response.finished()).toBeNull();
+  expect((await response.json()).profile.phone).toBe(phone);
+}
+
 function observeCollection(page) {
   const requests = [];
   page.on('request', request => {
@@ -31,8 +49,9 @@ for (const [width, height] of [[320, 740], [390, 844], [1440, 960]]) {
     const requests = observeCollection(page);
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
-    await publishedPhone(page, '+7 (900) 000-00-01');
-    await page.goto('/contact');
+    const phone = '+7 (900) 000-00-01';
+    await publishedPhone(page, phone);
+    await gotoWithPublishedContent(page, '/contact', phone);
     const section = page.locator('.contact-intro');
     await expect(section).toHaveAttribute('aria-labelledby', 'contact-title');
     const call = section.getByRole('link', { name: /Позвонить Анне/ });
@@ -56,12 +75,15 @@ for (const [width, height] of [[320, 740], [390, 844], [1440, 960]]) {
     await noIntake(page, requests);
     await page.screenshot({ path: testInfo.outputPath(`direct-contact-${width}-top.png`) });
     await section.screenshot({ path: testInfo.outputPath(`direct-contact-${width}-section.png`) });
-    await page.goto('/services');
+    await gotoWithPublishedContent(page, '/services', phone);
+    // In WebKit, immediately going Back after `load` can unload /services
+    // before its mount effect starts fetch. Verify the hydrated CMS value first.
+    await expect(page.locator('footer a[href="tel:+79000000001"]')).toHaveText(phone);
     await page.goBack();
     await expect(call).toHaveAttribute('href', 'tel:+79000000001');
     await page.reload();
     await expect(sms).toHaveAttribute('href', 'sms:+79000000001');
-    await page.goto('/contact/');
+    await gotoWithPublishedContent(page, '/contact/', phone);
     await expect(call).toHaveAttribute('href', 'tel:+79000000001');
     await expect(page.locator('.site-header')).toHaveClass(/scrolled/);
     await noIntake(page, requests);
@@ -74,7 +96,7 @@ test('new contact actions do not invent a phone or SMS destination for unavailab
   for (const phone of ['', 'javascript:+79000000000', '+7 (495) 000-00-00']) {
     await page.unroute('**/api/content');
     await publishedPhone(page, phone);
-    await page.goto('/contact');
+    await gotoWithPublishedContent(page, '/contact', phone);
     const section = page.locator('.contact-intro');
     await expect(section).toBeVisible();
     if (phone.startsWith('+7')) {

@@ -47,3 +47,17 @@ test('six photos can be appended to one visit and one deleted without losing the
  await page.locator('.clinical-gallery-visit').last().getByRole('button',{name:'Удалить фото'}).first().click();
  await expect(page.locator('.clinical-gallery-visit').last().locator('.clinical-gallery-photo')).toHaveCount(5);
 });
+
+test('archive selected synthetic card, restores after clearing, and prints only selected card',async ({page})=>{
+ await page.goto('/admin/patients');
+ await expect(page.getByRole('button',{name:'Скачать архив карты (ZIP)'})).toBeVisible();
+ const [download]=await Promise.all([page.waitForEvent('download'),page.getByRole('button',{name:'Скачать архив карты (ZIP)'}).click()]);
+ expect(download.suggestedFilename()).toMatch(/anna-demo-history-001.zip/);
+ await expect(page.locator('.clinical-print-report')).toContainText('Демо-клиент 001');
+ await expect(page.locator('.clinical-print-report')).not.toContainText('Демо-клиент 002');
+ await page.getByRole('checkbox',{name:'Фото в PDF'}).uncheck();
+ await expect(page.locator('.clinical-print-photos')).toHaveCount(0);
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'Удалить выбранную тестовую карту'}).click();
+ await expect(page.getByRole('heading',{name:'Демо-клиент 002',exact:true})).toBeVisible();
+});

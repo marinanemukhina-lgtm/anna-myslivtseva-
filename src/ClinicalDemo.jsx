@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { PERSONAS, PROCEDURES, ANGLES, restoreClinicalDemo, emptyClinicalDemo, exampleClinicalDemo, addDemoClient, addDemoVisit, setDemoPhoto, addDemoPhoto, updateDemoPhoto, deleteDemoPhoto } from '../shared/clinical-demo.mjs';
+import { PERSONAS, PROCEDURES, ANGLES, restoreClinicalDemo, emptyClinicalDemo, exampleClinicalDemo, addDemoClient, addDemoVisit, setDemoPhoto, addDemoPhoto, updateDemoPhoto, deleteDemoPhoto, deleteDemoClient } from '../shared/clinical-demo.mjs';
 import './clinical-demo.css';
 import VoiceNote from './VoiceNote.jsx';
 import { encodeClinicalPhoto } from './clinical-photo.mjs';
 import ClinicalGallery from './ClinicalGallery.jsx';
+import ClinicalPrint from './ClinicalPrint.jsx';
+import { exportClinicalHistory, importClinicalHistory } from './clinical-archive.mjs';
 const STORAGE = 'anna-open-synthetic-clinical-v1';
 function initial() {
   try { const saved = localStorage.getItem(STORAGE); return saved ? restoreClinicalDemo(JSON.parse(saved)) : exampleClinicalDemo(); }
@@ -24,8 +26,9 @@ export default function ClinicalDemo() {
   const [message, setMessage] = useState(''), [photoBusy,setBusy] = useState(false), [angle,setAngle] = useState(ANGLES[0]);
   const [beforeId,setBeforeId] = useState(''), [afterId,setAfterId] = useState('');
   const [voiceBusy, setVoiceBusy] = useState(false);
+  const [importBusy,setImportBusy]=useState(false),[printPhotos,setPrintPhotos]=useState(true),[printNotes,setPrintNotes]=useState(true);
   const [beforePicture,setBeforePicture]=useState(''),[afterPicture,setAfterPicture]=useState('');
-  const busy = photoBusy || voiceBusy, note = drafts[selected] ?? '';
+  const busy = photoBusy || voiceBusy || importBusy, note = drafts[selected] ?? '';
   const setNote = value => setDrafts(current => ({...current, [selected]: value}));
   const client = state.clients.find(c => c.id === selected), visits = state.visits.filter(v => v.clientId === selected).sort((a,b)=>a.date.localeCompare(b.date));
   const before = visits.find(v=>v.id===beforeId) ?? visits[0], after = visits.find(v=>v.id===afterId) ?? visits.at(-1);
@@ -88,6 +91,34 @@ export default function ClinicalDemo() {
     const url=URL.createObjectURL(new Blob([JSON.stringify(state,null,2)],{type:'application/json'}));
     const link=document.createElement('a');link.href=url;link.download='anna-synthetic-histories.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
+  function downloadSelectedArchive(){
+    if(!client)return;
+    try{
+      const zip=exportClinicalHistory(state,client.id);
+      const url=URL.createObjectURL(new Blob([zip],{type:'application/zip'}));
+      const link=document.createElement('a');link.href=url;link.download='anna-demo-history-'+client.label.replace(/[^0-9]/g,'')+'.zip';link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      setMessage('Началась загрузка ZIP. Проверьте, что файл сохранён и открывается, прежде чем удалять карту.');
+    }catch{setMessage('Не удалось подготовить архив. Ничего не удалено.');}
+  }
+  async function restoreSelectedArchive(event){
+    const input=event.currentTarget,file=input.files?.[0];input.value='';if(!file)return;
+    if(file.size>60*1024*1024+200000){setMessage('Архив слишком большой.');return;}
+    setImportBusy(true);
+    try{
+      const next=restoreClinicalDemo(importClinicalHistory(await file.arrayBuffer()));
+      if(!confirm('Заменить ВСЕ тестовые карты этого браузера данными из выбранного ZIP? Это не затронет фотографии телефона.'))return;
+      if(save(next,'Демонстрационная история восстановлена из ZIP.')){setSelected(next.clients[0]?.id??'');setBeforeId('');setAfterId('');}
+    }catch{setMessage('Не удалось восстановить архив. Данные кабинета не изменены.');}
+    finally{setImportBusy(false);}
+  }
+  function removeSelectedClient(){
+    if(!client||!confirm('Удалить выбранную тестовую карту и ВСЕ её посещения и фотографии из этого браузера? Убедитесь, что внешний архив сохранён.'))return;
+    try{
+      const next=deleteDemoClient(state,client.id);
+      if(save(next,'Выбранная тестовая карта удалена.')){setSelected(next.clients[0]?.id??'');setBeforeId('');setAfterId('');setDrafts(current=>({...current,[client.id]:''}));}
+    }catch{setMessage('Не удалось удалить тестовую карту.');}
+  }
   return <main className="clinical-shell">
     <nav className="clinical-nav" aria-label="Разделы демонстрации"><a href="/">Сайт Анны</a><a href="/admin">Админка</a><a href="/demo/booking">Онлайн-запись · демо</a></nav>
     <h1>Пациенты и истории</h1>
@@ -95,10 +126,17 @@ export default function ClinicalDemo() {
     <p className="clinical-demo-note">Открытый пример с вымышленными картами. Используйте только вымышленные заметки и тестовые изображения. Карты и фото сохраняются в этом браузере и не отправляются на сервер.</p>
     <div className="clinical-actions">
       {unused.length>0 && <button className="admin-primary" disabled={busy} onClick={create}>Создать {unused[0]}</button>}
-      <button className="clinical-secondary" onClick={download}>Скачать тестовые истории</button>
+      <button className="clinical-secondary" onClick={download}>Скачать все тестовые истории (JSON)</button>
+      {client && <>
+        <button className="clinical-secondary" disabled={busy} onClick={downloadSelectedArchive}>Скачать архив карты (ZIP)</button>
+        <button className="clinical-secondary" disabled={busy} onClick={()=>window.print()}>Печать / Сохранить PDF</button>
+        <label className="clinical-photo-upload clinical-archive-upload">Загрузить архив ZIP<input type="file" accept=".zip,application/zip" disabled={busy} aria-label="Загрузить архив ZIP" onChange={restoreSelectedArchive}/></label>
+        <button className="clinical-secondary clinical-delete-client" disabled={busy} onClick={removeSelectedClient}>Удалить выбранную тестовую карту</button>
+      </>}
       <button className="clinical-secondary" disabled={busy} onClick={clear}>Начать с пустого кабинета</button>
       {!state.clients.length && <button className="clinical-secondary" onClick={example}>Показать пример истории</button>}
     </div>
+    {client && <div className="clinical-print-options"><label><input type="checkbox" checked={printNotes} onChange={e=>setPrintNotes(e.target.checked)}/> Заметки в PDF</label><label><input type="checkbox" checked={printPhotos} onChange={e=>setPrintPhotos(e.target.checked)}/> Фото в PDF</label><p>PDF создаётся через меню печати устройства. Архив ZIP не удаляет карту автоматически.</p></div>}
     <p role="status" className="clinical-status">{photoBusy ? 'Сохраняем тестовое фото…' : message}</p>
     <div className="clinical-grid">
       <aside className="clinical-people"><h2>Карты</h2>{state.clients.map(c=><button key={c.id} disabled={busy} className={selected===c.id?'active':''} onClick={()=>choose(c.id)}>{c.label}</button>)}{!state.clients.length && <p>Кабинет пуст. Создайте тестовую карту.</p>}</aside>
@@ -119,5 +157,6 @@ export default function ClinicalDemo() {
         </form></section>
       </> : <section className="clinical-card"><h2>Начните с тестовой карты</h2><p>Здесь появятся история посещений и фотографии до и после.</p></section>}</div>
     </div>
+    {client && <ClinicalPrint client={client} visits={visits} photos={state.photos} showNotes={printNotes} showPhotos={printPhotos}/>}
   </main>;
 }

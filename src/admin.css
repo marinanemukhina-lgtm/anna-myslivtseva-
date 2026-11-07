@@ -15,6 +15,16 @@
   min-height: 100dvh;
   background: var(--admin-bg);
 }
+.callback-inbox-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+.callback-inbox > p { margin-top: 18px; max-width: 72ch; }
+.callback-inbox-note { font-size: 12px; }
+.callback-inbox-list { margin: 24px 0; padding: 0; list-style: none; }
+.callback-inbox-list li { padding: 22px 0; border-top: 1px solid var(--admin-border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+.callback-inbox-list li > div { display: grid; gap: 8px; }
+.callback-number { font-size: 21px; min-height: 44px; display: flex; align-items: center; text-decoration: underline; }
+.callback-status { font-size: 12px; font-weight: 600; }
+.callback-status.new { color: #7b3a00; }
+.callback-empty { padding-block: 20px; }
 .admin-sidebar {
   position: sticky;
   top: 0;

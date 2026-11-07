@@ -1,5 +1,6 @@
 import express from "express";
 import { registerMarketing } from "./marketing.mjs";
+import { registerCallbackBodyLimit, registerCallbacks } from "./callbacks.mjs";
 import { registerPrivateBooking } from "./booking-occupancy.mjs";
 import { registerPublicPages } from "./public-pages.mjs";
 import { temporaryContentAccess, temporaryCalendarAccess, contentPayload } from "./temporary-content-access.mjs";
@@ -104,6 +105,7 @@ export function createApp() {
     next();
   });
   closePublicIntake(app);
+  registerCallbackBodyLimit(app);
   // 3 MiB of file bytes expands to 4 MiB in base64, plus the JSON envelope.
   app.use(express.json({ limit: 4 * 1024 * 1024 + 16 * 1024 }));
   app.use("/api", (req, res, next) => {
@@ -340,6 +342,7 @@ export function createApp() {
   });
   registerBookingPreparation(app, requireAdmin, requireCalendarAccess);
   registerMarketing(app, requireAdmin, requireContentAccess);
+  registerCallbacks(app, requireAdmin);
   registerPrivateBooking(app, requireAdmin);
   registerPublicPages(app);
   app.use("/api", (_req, res) =>

@@ -4,10 +4,12 @@ import { useSite } from "./App.jsx";
 import "./admin.css";
 import { profileDraft, socialChannels } from "../shared/anna-materials.mjs";
 import AdminCalendar from "./AdminCalendar.jsx";
+import AdminCallbacks from "./AdminCallbacks.jsx";
 import { mergeScheduleSave } from "./booking-client.mjs";
 const tabs = [
   ["profile", "О себе и сайт"],
   ["social", "Соцсети"],
+  ["callbacks", "Обратные звонки"],
   ["calendar", "Календарь и запись"],
   ["services", "Услуги и цены"],
   ["news", "Новости"],
@@ -155,7 +157,7 @@ export default function Admin() {
   const [calendarBusy, setCalendarBusy] = useState(false);
   const [contentOnlyAccess, setContentOnlyAccess] = useState(false);
   const [temporaryCalendarAccess, setTemporaryCalendarAccess] = useState(false);
-  const visibleTabs = contentOnlyAccess && !temporaryCalendarAccess ? tabs.filter(([key]) => key !== "calendar") : tabs;
+  const visibleTabs = tabs.filter(([key]) => !(contentOnlyAccess && key === "callbacks") && !(contentOnlyAccess && !temporaryCalendarAccess && key === "calendar"));
   const [auth, setAuth] = useState(null),
     [configured, setConfigured] = useState(true),
     [password, setPassword] = useState(""),
@@ -294,7 +296,7 @@ export default function Admin() {
       d.profile[key] = value;
     });
   const item =
-    payload && tab !== "profile" && tab !== "calendar" && tab !== "social"
+    payload && tab !== "profile" && tab !== "calendar" && tab !== "social" && tab !== "callbacks"
       ? payload.data[tab].find((x) => x.id === selected)
       : null;
   const changeItem = (key, value) =>
@@ -435,7 +437,7 @@ export default function Admin() {
               }}
             >
               {label}
-              {payload && key !== "profile" && key !== "calendar" && key !== "social" && (
+              {payload && key !== "profile" && key !== "calendar" && key !== "social" && key !== "callbacks" && (
                 <span>{payload.data[key].length}</span>
               )}
             </button>
@@ -513,13 +515,13 @@ export default function Admin() {
         <header className="admin-topbar">
           <div>
             <span className="eyebrow">
-              {tab === "calendar" ? "Подготовка расписания" : dirty
+              {tab === "callbacks" ? "Защищённые обращения" : tab === "calendar" ? "Подготовка расписания" : dirty
                 ? "Есть несохранённые изменения"
                 : "Все изменения сохранены"}
             </span>
             <h1>{tabs.find((t) => t[0] === tab)?.[1]}</h1>
           </div>
-          {tab !== "calendar" && <button
+          {tab !== "calendar" && tab !== "callbacks" && <button
             className="admin-primary"
             onClick={save}
             disabled={busy || sessionBusy || !dirty || !payload}
@@ -539,6 +541,8 @@ export default function Admin() {
         )}
         {!payload ? (
           <p>Загрузка…</p>
+        ) : tab === "callbacks" ? (
+          contentOnlyAccess ? <p>Обращения доступны только владельцу после входа по паролю.</p> : <AdminCallbacks onUnauthenticated={() => setAuth(false)} />
         ) : tab === "calendar" ? (
           <AdminCalendar key={temporaryCalendarAccess ? "temporary" : "owner"} temporaryCalendarAccess={temporaryCalendarAccess} services={payload.data.services} onDirtyChange={setCalendarDirty} onBusyChange={setCalendarBusy} onUnauthenticated={() => setAuth(false)} onSaved={(previousVersion, saved) => setPayload(current => mergeScheduleSave(current, previousVersion, saved))} />
         ) : tab === "social" ? (
@@ -908,9 +912,9 @@ export default function Admin() {
           </div>
         )}
         <div className="admin-footnote">
-          Изменения публикуются после сохранения. {contentOnlyAccess
+          {tab === "callbacks" ? "Обращения не публикуются на сайте. Доступ к ним есть только у владельца." : <>Изменения публикуются после сохранения. {contentOnlyAccess
             ? "Пока доступ открыт, черновики в панели доступны всем посетителям."
-            : "Черновики видны только в этой панели."}
+            : "Черновики видны только в этой панели."}</>}
         </div>
       </main>
     </div>

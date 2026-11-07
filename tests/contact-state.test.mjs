@@ -12,7 +12,7 @@ const transformed = await transform(source
   .replace("import './booking.css';", '')
   .replace('export default function Booking', 'function Booking'), { loader: 'jsx' });
 const Booking = new Function('React', transformed.code + ';return Booking;')(React);
-const availableMessage = 'Для записи воспользуйтесь контактами ниже.';
+const availableMessage = 'Для записи воспользуйтесь контактами на этой странице.';
 const unavailableMessage = 'Контакты для записи ещё не опубликованы.';
 
 for (const [name, profile, available] of [

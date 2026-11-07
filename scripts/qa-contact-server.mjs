@@ -1,0 +1,24 @@
+// Isolated synthetic-only fixture. This entry point is never used in production.
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { scryptSync } from 'node:crypto';
+process.env.DATA_DIR = mkdtempSync(join(tmpdir(), 'anna-contact-browser-'));
+process.env.ADMIN_PASSWORD_HASH = 'contact-fixture:' + scryptSync('contact-fixture-only-password', 'contact-fixture', 64).toString('hex');
+process.env.CONTACT_CALLBACK_ENABLED = 'true';
+process.env.CONTACT_CALLBACK_DATA_APPROVED = 'true';
+delete process.env.DATABASE_URL;
+delete process.env.VERCEL;
+const { database } = await import('../server/db.mjs');
+const { initialContent } = await import('../shared/content.mjs');
+const content = structuredClone(initialContent);
+content.profile.phone = '+7 (900) 000-00-00';
+content.profile.privacy = 'Синтетическая политика только для автоматических тестов. Не юридический документ и не данные посетителей.';
+const { query } = await database();
+await query('UPDATE content SET body=$1 WHERE id=$2', [JSON.stringify(content), 'main']);
+const { default: express } = await import('express');
+const { createApp } = await import('../server/app.mjs');
+const app = createApp();
+app.use(express.static('dist/client'));
+app.get('/{*path}', (_req, res) => res.sendFile(resolve('dist/client/index.html')));
+app.listen(4184, '0.0.0.0', () => console.log('Synthetic contact fixture ready on 4184'));

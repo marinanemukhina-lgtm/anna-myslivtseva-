@@ -41,7 +41,6 @@ test('anonymous admin endpoints remain protected after handoff', async (t) => {
   const request=(route,method='GET',body,headers={})=>new Promise((resolve,reject)=>{
     const req=http.request({hostname:'127.0.0.1',port:server.address().port,path:route,method,headers:{host,origin:'https://'+host,'content-type':'application/json',...headers}},res=>{const chunks=[];res.on('data',x=>chunks.push(x));res.on('end',()=>resolve(new Response(Buffer.concat(chunks),{status:res.statusCode,headers:res.headers})));});req.on('error',reject);req.end(body===undefined?undefined:JSON.stringify(body));
   });
-  process.env.VERCEL='1';process.env.VERCEL_ENV='production';
   const session=await(await request('/api/session')).json();
   assert.equal(session.authenticated,false);assert.equal(session.temporaryContentAccess,false);assert.equal(session.temporaryCalendarAccess,false);
   for(const route of ['/api/admin/content','/api/admin/booking','/api/admin/marketing','/admin/marketing','/api/admin/booking/occupancy'])assert.equal((await request(route)).status,401,route);

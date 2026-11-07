@@ -57,10 +57,8 @@ export default function AdminCallbacks({ onUnauthenticated }) {
     } finally { clearTimeout(timeout); if (pending.current === controller) pending.current = null; if (active.current) setBusy(false); }
   }
   return <section className="admin-card callback-inbox" aria-label="Обращения на обратный звонок">
-    <div className="callback-inbox-heading"><h2>Обратные звонки</h2><button className="admin-primary" type="button" disabled={busy} onClick={() => load()}>Обновить список</button></div>
-    <p>Номера хранятся на сервере и доступны только владельцу. Автоматические уведомления и сообщения посетителям не отправляются: проверяйте этот список.</p>
+    <div className="callback-inbox-heading"><h2>Заявки</h2><button className="admin-primary" type="button" disabled={busy} onClick={() => load()}>Обновить список</button></div>
     {data && !data.enabled && <p className="admin-alert">Новые заявки не принимаются. {data.reason}</p>}
-    <p className="callback-inbox-note">Обращения удаляются из рабочего списка после 30 дней при следующем обращении к сервису. Не добавляйте сюда медицинские сведения.</p>
     {error && <p className="admin-error" role="alert">{error}</p>}
     {notice && <p role="status">{notice}</p>}
     {!data ? <p role="status">{busy ? "Загружаем обращения…" : "Список пока не загружен."}</p> : <>
@@ -71,5 +69,6 @@ export default function AdminCallbacks({ onUnauthenticated }) {
       </li>)}</ul>
       {data.nextCursor && <button type="button" className="admin-primary" disabled={busy} onClick={() => load(true)}>Загрузить ещё</button>}
     </>}
+    <details className="callback-inbox-help"><summary>Как обрабатываются заявки</summary><p>Номера хранятся на сервере и доступны только владельцу. Автоматические уведомления и сообщения посетителям не отправляются: проверяйте этот список.</p><p>Обращения удаляются из рабочего списка после 30 дней при следующем обращении к сервису. Не добавляйте сюда медицинские сведения.</p></details>
   </section>;
 }

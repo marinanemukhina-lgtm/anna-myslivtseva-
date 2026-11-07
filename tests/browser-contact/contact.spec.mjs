@@ -17,6 +17,7 @@ test('call, explicit SMS and server-persisted callback reach protected owner inb
   await input.fill(phone);
   await expect(page.getByRole('button',{name:'Перезвоните мне',exact:true})).toBeDisabled();
   await page.getByRole('checkbox').check();
+  await page.locator('.callback-form').screenshot({path:testInfo.outputPath('callback-form.png')});
   let submissions=0; page.on('request',r=>{if(r.url().endsWith('/api/contact/callback')&&r.method()==='POST')submissions++;});
   await page.getByRole('button',{name:'Перезвоните мне',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Заявка сохранена.'})).toBeVisible();
@@ -29,6 +30,8 @@ test('call, explicit SMS and server-persisted callback reach protected owner inb
   await page.getByRole('button',{name:'Войти',exact:true}).click();
   const row=page.locator('.callback-inbox-list li').filter({hasText:phone.replaceAll(' ','')});
   await expect(row).toBeVisible();
+  await expect(page.locator('.admin-main')).toContainText('Обращения не публикуются на сайте.');
+  await expect(page.locator('.admin-main')).not.toContainText('Изменения публикуются после сохранения.');
   await expect(row.getByRole('link')).toHaveAttribute('href','tel:'+phone.replaceAll(' ',''));
   await row.getByRole('button',{name:'Отметить обработанным'}).click();
   await expect(row).toContainText('Обработано');

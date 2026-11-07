@@ -25,6 +25,9 @@
 .callback-status { font-size: 12px; font-weight: 600; }
 .callback-status.new { color: #7b3a00; }
 .callback-empty { padding-block: 20px; }
+.callback-inbox-help { border-top: 1px solid var(--admin-border); padding-top: 16px; font-size: 13px; }
+.callback-inbox-help summary { cursor: pointer; min-height: 44px; display: list-item; }
+.callback-inbox-help p { margin: 12px 0; max-width: 72ch; }
 .admin-sidebar {
   position: sticky;
   top: 0;

@@ -254,23 +254,39 @@ test('manual topics support cancel, Escape, repeat save and safe switching witho
 test('materials show prepared copy, editorial plan and saved social links without publishing', async ({page,baseURL}) => {
   const socialUrl='https://t.me/synthetic_test_'+test.info().project.name.replaceAll('-','_');
   await loginAndReset(page,baseURL);
-  await page.getByRole('button',{name:'Материалы и план',exact:true}).click();
-  await expect(page.locator('#materialsStatus')).toContainText('Данные из админки загружены');
-  await expect(page.locator('#annaPlan article')).toHaveCount(4);
-  await expect(page.locator('#annaPrepared')).toContainText('Выездной приём');
-  await expect(page.locator('#annaDiplomas')).toContainText('нет загруженных дипломов');
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-  await page.getByRole('link',{name:'Заполнить ссылки на соцсети'}).click();
-  await expect(page.getByRole('heading',{name:'Соцсети Анны',exact:true})).toBeVisible();
-  await page.getByRole('textbox',{name:/^Telegram · канал · ссылка(?:\s|$)/}).fill(socialUrl);
-  const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/admin/content' && r.request().method()==='PUT');
-  await page.getByRole('button',{name:'Сохранить изменения',exact:true}).click();
-  expect((await saved).status()).toBe(200);
-  await expect(page.getByRole('button',{name:'Сохранить изменения',exact:true})).toBeDisabled();
-  await page.reload();
-  await expect(page.getByRole('textbox',{name:/^Telegram · канал · ссылка(?:\s|$)/})).toHaveValue(socialUrl);
-  await page.getByRole('link',{name:'Маркетинг и прогрев',exact:true}).click();
-  await page.getByRole('button',{name:'Материалы и план',exact:true}).click();
-  await expect(page.locator('#annaSocials')).toContainText(socialUrl);
-  await expect(page.locator('#materialsView')).toContainText('отправка публикаций пока не настроены');
+  const originalResponse = await page.request.get('/api/admin/content');
+  expect(originalResponse.status()).toBe(200);
+  const original = await originalResponse.json();
+  try {
+    await page.getByRole('button',{name:'Материалы и план',exact:true}).click();
+    await expect(page.locator('#materialsStatus')).toContainText('Данные из админки загружены');
+    await expect(page.locator('#annaPlan article')).toHaveCount(4);
+    await expect(page.locator('#annaPrepared')).toContainText('Выездной приём');
+    await expect(page.locator('#annaDiplomas')).toContainText('нет загруженных дипломов');
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.getByRole('link',{name:'Заполнить ссылки на соцсети'}).click();
+    await expect(page.getByRole('heading',{name:'Соцсети Анны',exact:true})).toBeVisible();
+    await page.getByRole('textbox',{name:/^Telegram · канал · ссылка(?:\s|$)/}).fill(socialUrl);
+    const saved=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/admin/content' && r.request().method()==='PUT');
+    await page.getByRole('button',{name:'Сохранить изменения',exact:true}).click();
+    expect((await saved).status()).toBe(200);
+    await expect(page.getByRole('button',{name:'Сохранить изменения',exact:true})).toBeDisabled();
+    await page.reload();
+    await expect(page.getByRole('textbox',{name:/^Telegram · канал · ссылка(?:\s|$)/})).toHaveValue(socialUrl);
+    await page.getByRole('link',{name:'Маркетинг и прогрев',exact:true}).click();
+    await page.getByRole('button',{name:'Материалы и план',exact:true}).click();
+    await expect(page.locator('#annaSocials')).toContainText(socialUrl);
+    await expect(page.locator('#materialsView')).toContainText('отправка публикаций пока не настроены');
+  } finally {
+    const currentResponse = await page.request.get('/api/admin/content');
+    expect(currentResponse.status()).toBe(200);
+    const current = await currentResponse.json();
+    const restored = await page.request.put('/api/admin/content', {
+      headers: headers(baseURL), data: { data: original.data, version: current.version },
+    });
+    expect(restored.status()).toBe(200);
+    const verified = await page.request.get('/api/admin/content');
+    expect(verified.status()).toBe(200);
+    expect((await verified.json()).data).toEqual(original.data);
+  }
 });

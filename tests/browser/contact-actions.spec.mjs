@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { initialContent } from '../../shared/content.mjs';
 
 async function publishedPhone(page, phone) {
-  // Browser-only synthetic content. No CMS writes or real calls/messages.
-  await page.route('**/api/content', async route => {
-    const response = await route.fetch();
-    const data = await response.json();
-    data.profile.phone = phone;
-    await route.fulfill({ response, json: data });
-  });
+  // Phone-only response fixture, independent of other tests' synthetic CMS writes.
+  // No CMS writes or real calls/messages.
+  const data = structuredClone(initialContent);
+  data.profile.phone = phone;
+  data.profile.socialUrl = '';
+  data.profile.socialLinks = {};
+  await page.route('**/api/content', route => route.fulfill({ json: data }));
 }
 
 async function gotoWithPublishedContent(page, url, phone) {

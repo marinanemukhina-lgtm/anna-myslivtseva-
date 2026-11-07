@@ -1841,7 +1841,9 @@ html { scroll-padding-top: 110px; }
   .link-pictures span { font-size: 38px; }
   .footer { margin-top: 70px; padding-top: 55px; }
   .footer-tagline { font-size: 44px; }
-  .footer-grid { grid-template-columns: 1fr 100px; gap: 20px; }
+  .footer-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .contacts > div { grid-template-columns: 3em minmax(0, 1fr); }
+  .contacts > div > span { white-space: nowrap; }
   .footer .contacts,.hours { font-size: 13px; }
   .footer-bottom { font-size: 12px; gap: 20px; }
   .footer-marquee { font-size: 78px; }

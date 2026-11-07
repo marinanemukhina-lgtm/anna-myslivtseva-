@@ -1,3 +1,4 @@
+import { allowsInitialContentFallback } from "./storage-config.mjs";
 import { readFile } from 'node:fs/promises';
 import { readContent } from './db.mjs';
 import { initialContent, publicContent } from '../shared/content.mjs';
@@ -34,7 +35,7 @@ export function registerPublicPages(app) {
     if (req.path !== '/' && req.path.endsWith('/')) return res.redirect(308, req.path.replace(/^\/+/, '/').replace(/\/+$/, '') + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : ''));
     try {
       const template = await readFile(new URL('../dist/client/index.html', import.meta.url),'utf8');
-      const raw = process.env.VERCEL && !process.env.DATABASE_URL ? initialContent : (await readContent()).data;
+      const raw = allowsInitialContentFallback(process.env) ? initialContent : (await readContent()).data;
       const result = renderPublicPage(template,req.path,raw);
       res.set('Cache-Control','no-store');
       if (result.noindex) res.set('X-Robots-Tag','noindex, nofollow');

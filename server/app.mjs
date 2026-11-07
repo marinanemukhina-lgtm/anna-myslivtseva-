@@ -1,4 +1,5 @@
 import express from "express";
+import { allowsInitialContentFallback, storageConfigurationReady } from "./storage-config.mjs";
 import { registerMarketing } from "./marketing.mjs";
 import { registerCallbackBodyLimit, registerCallbacks } from "./callbacks.mjs";
 import { registerPrivateBooking } from "./booking-occupancy.mjs";
@@ -132,7 +133,7 @@ export function createApp() {
   });
   app.get("/api/content", async (req, res, next) => {
     try {
-      if (process.env.VERCEL && !process.env.DATABASE_URL)
+      if (allowsInitialContentFallback(process.env))
         return res.json(publicContent(initialContent));
       res.json(publicContent((await readContent()).data));
     } catch (e) {
@@ -147,7 +148,7 @@ export function createApp() {
         temporaryCalendarAccess: temporaryCalendarAccess(req),
         configured:
           !!process.env.ADMIN_PASSWORD_HASH &&
-          (!process.env.VERCEL || !!process.env.DATABASE_URL),
+          storageConfigurationReady(process.env),
       });
     } catch (e) {
       if (e.message === "STORAGE_NOT_CONFIGURED")

@@ -1,6 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { initialContent } from "../shared/content.mjs";
+import { storageDriver } from "./storage-config.mjs";
 let ready;
 export function database() {
   if (!ready)
@@ -11,8 +12,12 @@ export function database() {
   return ready;
 }
 async function init() {
-  let query, transaction;
-  if (process.env.DATABASE_URL) {
+  let query, transaction, close;
+  const driver = storageDriver(process.env);
+  if (driver === "postgres") {
+    const { createPostgresAdapter } = await import("./postgres.mjs");
+    ({ query, transaction, close } = await createPostgresAdapter(process.env));
+  } else if (driver === "neon") {
     const { neon } = await import("@neondatabase/serverless");
     const sql = neon(process.env.DATABASE_URL);
     query = (s, args = []) => sql.query(s, args);
@@ -50,23 +55,28 @@ async function init() {
       }
     };
   }
-  await query(
-    "CREATE TABLE IF NOT EXISTS content (id TEXT PRIMARY KEY, body TEXT NOT NULL, version INTEGER NOT NULL)",
-  );
-  await query(
-    "CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, expires BIGINT NOT NULL)",
-  );
-  await query(
-    "CREATE TABLE IF NOT EXISTS media (id TEXT PRIMARY KEY, mime TEXT NOT NULL, body TEXT NOT NULL, name TEXT NOT NULL)",
-  );
-  await query(
-    "CREATE TABLE IF NOT EXISTS attempts (id TEXT PRIMARY KEY, count INTEGER NOT NULL, expires BIGINT NOT NULL)",
-  );
-  await query(
-    "INSERT INTO content (id,body,version) VALUES ($1,$2,1) ON CONFLICT (id) DO NOTHING",
-    ["main", JSON.stringify(initialContent)],
-  );
-  return { query, transaction };
+  try {
+    await query(
+      "CREATE TABLE IF NOT EXISTS content (id TEXT PRIMARY KEY, body TEXT NOT NULL, version INTEGER NOT NULL)",
+    );
+    await query(
+      "CREATE TABLE IF NOT EXISTS sessions (id TEXT PRIMARY KEY, expires BIGINT NOT NULL)",
+    );
+    await query(
+      "CREATE TABLE IF NOT EXISTS media (id TEXT PRIMARY KEY, mime TEXT NOT NULL, body TEXT NOT NULL, name TEXT NOT NULL)",
+    );
+    await query(
+      "CREATE TABLE IF NOT EXISTS attempts (id TEXT PRIMARY KEY, count INTEGER NOT NULL, expires BIGINT NOT NULL)",
+    );
+    await query(
+      "INSERT INTO content (id,body,version) VALUES ($1,$2,1) ON CONFLICT (id) DO NOTHING",
+      ["main", JSON.stringify(initialContent)],
+    );
+    return { query, transaction };
+  } catch (error) {
+    if (close) await close().catch(() => {});
+    throw error;
+  }
 }
 export async function readContent() {
   const { query } = await database();

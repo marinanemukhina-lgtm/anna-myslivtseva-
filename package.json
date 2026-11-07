@@ -11,7 +11,7 @@
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "start": "node server/start.mjs",
     "setup": "node scripts/setup.mjs",
-    "test": "node --test tests/api.test.mjs tests/assets.test.mjs tests/admin-save.test.mjs tests/admin-password-hash.test.mjs tests/booking-client.test.mjs tests/booking-preparation.test.mjs tests/booking-availability.test.mjs tests/contact-state.test.mjs tests/public-pages.test.mjs tests/temporary-content-access.test.mjs tests/booking-busy.test.mjs tests/anonymous-booking-store.test.mjs tests/private-booking-state.test.mjs tests/booking-occupancy-api.test.mjs tests/booking-ics.test.mjs tests/shifter-preview.test.mjs tests/private-booking-postgres.test.mjs tests/marketing.test.mjs tests/marketing-validation.test.mjs tests/marketing-workspace.test.mjs tests/marketing-topics.test.mjs tests/synthetic-booking-demo.test.mjs tests/open-clinical-demo.test.mjs tests/clinical-photo.test.mjs tests/clinical-archive.test.mjs tests/contact-methods.test.mjs tests/callbacks.test.mjs tests/callbacks-postgres.test.mjs",
+    "test": "node --test tests/api.test.mjs tests/assets.test.mjs tests/admin-save.test.mjs tests/admin-password-hash.test.mjs tests/booking-client.test.mjs tests/booking-preparation.test.mjs tests/booking-availability.test.mjs tests/contact-state.test.mjs tests/public-pages.test.mjs tests/temporary-content-access.test.mjs tests/booking-busy.test.mjs tests/anonymous-booking-store.test.mjs tests/private-booking-state.test.mjs tests/booking-occupancy-api.test.mjs tests/booking-ics.test.mjs tests/shifter-preview.test.mjs tests/private-booking-postgres.test.mjs tests/marketing.test.mjs tests/marketing-validation.test.mjs tests/marketing-workspace.test.mjs tests/marketing-topics.test.mjs tests/synthetic-booking-demo.test.mjs tests/open-clinical-demo.test.mjs tests/clinical-photo.test.mjs tests/clinical-archive.test.mjs tests/contact-methods.test.mjs tests/callbacks.test.mjs tests/callbacks-postgres.test.mjs tests/postgres-adapter.test.mjs tests/postgres-native.test.mjs tests/migration-preparation.test.mjs",
     "test:sites": "node --test tests/sites-worker.test.mjs",
     "prebuild": "node scripts/restore-media.mjs",
     "predev": "node scripts/restore-media.mjs",
@@ -21,7 +21,8 @@
     "test:booking-demo": "node --test tests/synthetic-booking-demo.test.mjs",
     "build:booking-demo": "node scripts/build-booking-demo.mjs",
     "test:booking-demo:browser": "playwright test --config playwright.booking-demo.config.mjs",
-    "test:contact:browser": "playwright test --config playwright.contact.config.mjs"
+    "test:contact:browser": "playwright test --config playwright.contact.config.mjs",
+    "test:postgres:native": "node --test --test-concurrency=1 tests/postgres-adapter.test.mjs tests/postgres-native.test.mjs"
   },
   "dependencies": {
     "@fontsource/cormorant-garamond": "5.2.8",
@@ -34,6 +35,7 @@
     "express": "5.1.0",
     "gsap": "3.13.0",
     "lenis": "1.3.11",
+    "pg": "8.23.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "vite": "6.4.2",

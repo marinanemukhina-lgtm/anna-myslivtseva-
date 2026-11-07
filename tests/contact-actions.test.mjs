@@ -5,14 +5,20 @@ import { transform } from "esbuild";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { contactMethods } from "../src/contact-methods.mjs";
+import { publicSocialLinks } from "../shared/contact-links.mjs";
 
+const socialSource = await readFile(new URL("../src/SocialLinks.jsx", import.meta.url), "utf8");
+const socialCompiled = await transform(socialSource.replace("import React from 'react';", "").replace("import { publicSocialLinks } from '../shared/contact-links.mjs';", "").replace("export default function SocialLinks", "function SocialLinks"), {loader: 'jsx'});
+const SocialLinks = new Function('React', 'publicSocialLinks', socialCompiled.code + ';return SocialLinks;')(React, publicSocialLinks);
 const source = await readFile(new URL("../src/ContactActions.jsx", import.meta.url), "utf8");
 const transformed = await transform(source
   .replace('import React from "react";', "")
+  .replace('import SocialLinks from "./SocialLinks.jsx";', "")
+  .replace('import { publicSocialLinks } from "../shared/contact-links.mjs";', "")
   .replace('import { contactMethods } from "./contact-methods.mjs";', "")
   .replace('import "./contact.css";', "")
   .replace("export default function ContactActions", "function ContactActions"), { loader: "jsx" });
-const ContactActions = new Function("React", "contactMethods", transformed.code + ";return ContactActions;")(React, contactMethods);
+const ContactActions = new Function("React", "contactMethods", "SocialLinks", "publicSocialLinks", transformed.code + ";return ContactActions;")(React, contactMethods, SocialLinks, publicSocialLinks);
 const render = (profile) => renderToStaticMarkup(React.createElement(ContactActions, { profile }));
 
 test("direct contact component renders explicit phone and device SMS links from the supplied profile", () => {
@@ -50,4 +56,13 @@ test("contact integration keeps Booking and backend separation intact", async ()
   assert.match(contact, /<ContactActions profile=\{p\} \/>\s*<Booking profile=\{p\} \/>/);
   assert.match(contact, /<Contacts profile=\{p\} \/>/);
   assert.doesNotMatch(contact, /callback|fetch\s*\(/i);
+});
+
+test('published socials are explicit channel links, not personal chat promises', () => {
+  const html = render({socialLinks:{telegram:'https://t.me/synthetic_anna', vk:'https://vk.com/synthetic'}});
+  assert.match(html, /Канал в Telegram/);
+  assert.match(html, /href="https:\/\/t.me\/synthetic_anna"/);
+  assert.match(html, /noopener noreferrer/);
+  assert.doesNotMatch(html, /Написать Анне|Личный чат/);
+  assert.doesNotMatch(render({socialLinks:{telegram:'javascript:alert(1)'}}), /javascript:/);
 });

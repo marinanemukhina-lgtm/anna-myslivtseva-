@@ -19,3 +19,15 @@
   .contact-actions { max-width: none; }
   .contact-primary { flex-wrap: wrap; gap: 4px 16px; }
 }
+
+.social-links { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.social-links a { min-height: 44px; display: inline-flex; align-items: center; flex-wrap: wrap; }
+.social-links-prominent { margin-top: 24px; }
+.social-links-prominent a { border-bottom: 1px solid currentColor; }
+.social-links a:focus-visible, .contacts a:focus-visible, .footer-contact-link:focus-visible { outline: 3px solid #516db0; outline-offset: 4px; }
+.footer-contact-link { margin: 24px var(--gutter); display: inline-block; }
+.contacts { min-width: 0; overflow-wrap: anywhere; }
+
+.social-links .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+.contacts.compact a:focus-visible { outline-color: #a8b7d8; }

@@ -4,14 +4,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { build, transform } from 'esbuild';
 import React from 'react';
+import { contactMethods } from '../src/contact-methods.mjs';
+import { publicSocialLinks, safePublicUrl } from '../shared/contact-links.mjs';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 const source = fs.readFileSync('src/Booking.jsx', 'utf8');
 const transformed = await transform(source
   .replace("import React from 'react';", '')
   .replace("import './booking.css';", '')
+  .replace("import { contactMethods } from './contact-methods.mjs';", '')
+  .replace("import { publicSocialLinks, safePublicUrl } from '../shared/contact-links.mjs';", '')
   .replace('export default function Booking', 'function Booking'), { loader: 'jsx' });
-const Booking = new Function('React', transformed.code + ';return Booking;')(React);
+const Booking = new Function('React', 'contactMethods', 'publicSocialLinks', 'safePublicUrl', transformed.code + ';return Booking;')(React, contactMethods, publicSocialLinks, safePublicUrl);
 const availableMessage = 'Для записи воспользуйтесь контактами ниже.';
 const unavailableMessage = 'Контакты для записи ещё не опубликованы.';
 
@@ -19,7 +23,9 @@ for (const [name, profile, available] of [
   ['empty', {}, false],
   ['whitespace', { phone: '  ', email: '\t', socialUrl: '\n', bookingUrl: ' ' }, false],
   ['address alone', { address: 'Synthetic address' }, false],
-  ['phone', { phone: ' +000 ' }, true],
+  ['phone', { phone: ' +79000000001 ' }, true],
+  ['invalid phone', {phone: '+000'}, false],
+  ['structured social', {socialLinks:{telegram:'https://t.me/synthetic'}}, true],
   ['email', { email: ' test@example.invalid ' }, true],
   ['social', { socialUrl: ' https://example.invalid ' }, true],
   ['booking', { bookingUrl: ' https://example.invalid/book ' }, true],
@@ -67,7 +73,7 @@ const renderContact = profile => renderToStaticMarkup(React.createElement(Site.P
 }, React.createElement(Contact)));
 
 for (const [name, profile, href] of [
-  ['phone', { phone: '  +000  ' }, 'tel:+000'],
+  ['phone', { phone: '  +79000000001  ' }, 'tel:+79000000001'],
   ['email', { email: ' test@example.invalid ' }, 'mailto:test@example.invalid'],
   ['social', { socialUrl: ' https://example.invalid/social ' }, 'https://example.invalid/social'],
   ['booking', { bookingUrl: ' https://example.invalid/book ' }, 'https://example.invalid/book'],

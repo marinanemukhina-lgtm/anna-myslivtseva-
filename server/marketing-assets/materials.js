@@ -2,12 +2,12 @@
 (async () => {
   const el = id => document.getElementById(id);
   const text = (tag, value) => { const node = document.createElement(tag); node.textContent = value; return node; };
-  const https = value => typeof value === 'string' && /^https:\/\/[^\s]+$/i.test(value);
+  const https = value => { try { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password && !u.port && !/[\s\\]/.test(value); } catch { return false; } };
   const media = value => typeof value === 'string' && /^\/(?:media\/[a-zA-Z0-9_.-]+|api\/media\/[a-f0-9-]+)$/.test(value);
   try {
     const response = await fetch('/api/admin/marketing/materials', { credentials: 'same-origin', signal: AbortSignal.timeout(15000) });
     if (!response.ok) throw Error();
-    const { profile, diplomas, profileDraft, socialChannels, editorialPlan } = await response.json();
+    const { profile, diplomas, profileDraft, socialChannels, editorialPlan, publicSocialLinks = [] } = await response.json();
     el('annaDescription').textContent = [profile.name, profile.role, profile.intro, profile.about].filter(Boolean).join('\n\n');
     if (!profile.intro && !profile.about) el('annaDescription').append(text('p', 'Развёрнутое описание пока не сохранено. Подготовленный текст находится рядом.'));
     el('annaPrepared').textContent = profileDraft.intro + '\n\n' + profileDraft.about;
@@ -15,8 +15,9 @@
     el('annaQualification').textContent = profile.qualification || 'Сведения об образовании пока не заполнены.';
     for (const [key, label] of [...socialChannels, ['primary', 'Основная ссылка сайта']]) {
       const url = key === 'primary' ? profile.socialUrl : profile.socialLinks?.[key];
+      const visible = publicSocialLinks.some(link => link.key === key);
       const item = text('li', label + ': ');
-      if (https(url)) { const a = text('a', url); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; item.append(a, text('span', ' · ссылка сохранена')); }
+      if (https(url)) { const a = text('a', url); a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; item.append(a, text('span', visible ? ' · показывается на сайте; автопостинг не подключён' : ' · сохранено; на сайте скрыто или совпадает с другой ссылкой')); }
       else item.append(text('span', 'адрес пока не указан'));
       el('annaSocials').append(item);
     }

@@ -12,7 +12,7 @@ function utc(value) {
 function TimeInput({ label, value, onChange }) {
   return <label className="admin-field"><span>{label}</span><input type="text" required aria-label={label} placeholder="ГГГГ-ММ-ДДTчч:мм:ссZ" value={value} onChange={event => onChange(event.target.value)} autoComplete="off" spellCheck={false} /></label>;
 }
-export default function AdminOccupancy({ blocked = false, onUnauthenticated, onSaved, onBusyChange }) {
+export default function AdminOccupancy({ blocked = false, onUnauthenticated, onSaved, onBusyChange, onSnapshot }) {
   const [snapshot, setSnapshot] = useState(null), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [notice, setNotice] = useState('');
   const [interval, setInterval] = useState({ start: '', end: '' });
@@ -20,12 +20,12 @@ export default function AdminOccupancy({ blocked = false, onUnauthenticated, onS
   const [uncertain, setUncertain] = useState(false), [conflict, setConflict] = useState(false);
   const lock = useRef(false), pending = useRef(null);
   useEffect(() => { onBusyChange?.(busy || uncertain); return () => onBusyChange?.(false); }, [busy, uncertain, onBusyChange]);
-  const fail = err => { setError(err.status === 409 ? `Данные изменились или действие конфликтует с расписанием. Обновите занятость и проверьте её. ${err.message}` : err.message); if (err.status === 401) onUnauthenticated?.(); if (err.status === 409) setConflict(true); };
+  const fail = err => { if(err.status === 401) onSnapshot?.(null); setError(err.status === 409 ? `Данные изменились или действие конфликтует с расписанием. Обновите занятость и проверьте её. ${err.message}` : err.message); if (err.status === 401) onUnauthenticated?.(); if (err.status === 409) setConflict(true); };
   async function refresh() {
     if (lock.current) return;
     lock.current = true; setBusy(true); setError('');
     try {
-      const value = await bookingApi('/api/admin/booking/occupancy'); setSnapshot(value); setConflict(false);
+      const value = await bookingApi('/api/admin/booking/occupancy'); setSnapshot(value); onSnapshot?.(value); setConflict(false);
       const operation = pending.current;
       if (operation && value.occupancy.records.some(record => record.operationKey === operation.body.operationKey)) {
         pending.current = null; setUncertain(false); setNotice('Операция найдена в сохранённых данных. Проверьте список занятости.');
@@ -53,12 +53,12 @@ export default function AdminOccupancy({ blocked = false, onUnauthenticated, onS
       // Only the atomic write receipt proves which version this action replaced.
       // A later read may include somebody else's unrelated CMS changes.
       if (result.rebasedFromVersion === previousVersion && result.version === previousVersion + 1 && result.settings) onSaved?.(previousVersion, result);
-      const value = await bookingApi('/api/admin/booking/occupancy'); setSnapshot(value);
+      const value = await bookingApi('/api/admin/booking/occupancy'); setSnapshot(value); onSnapshot?.(value);
       setAttested(false); setNotice('Занятость сохранена. Публичная онлайн-запись выключена.');
     } catch (err) {
       fail(err);
       if (committed || !err.status || err.status >= 500) {
-        setUncertain(true);
+        setUncertain(true); onSnapshot?.(null);
         setError(committed ? 'Изменение сохранено, но обновить список не удалось. Обновите занятость перед следующим действием.' : 'Результат операции неизвестен. Сначала обновите занятость и проверьте список. При повторе интервала будет использован тот же ключ операции.');
       }
     } finally { lock.current = false; setBusy(false); }

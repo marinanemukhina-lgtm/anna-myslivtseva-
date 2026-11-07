@@ -2,11 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { bookingApi, dateInZone, formatAppointment, prepareScheduleDraft } from './booking-client.mjs';
 import './calendar.css';
 import AdminOccupancy from './AdminOccupancy.jsx';
+import AdminCalendarBoard from './AdminCalendarBoard.jsx';
 const weekdays = [[1, 'Понедельник'], [2, 'Вторник'], [3, 'Среда'], [4, 'Четверг'], [5, 'Пятница'], [6, 'Суббота'], [0, 'Воскресенье']];
-const monthBounds = month => {
-  const [year, number] = month.split('-').map(Number);
-  return { from: `${month}-01`, to: `${month}-${String(new Date(Date.UTC(year, number, 0)).getUTCDate()).padStart(2, '0')}` };
-};
 function Field({ label, value, onChange, type = 'text', min, max, hint, required = false }) {
   return <label className="admin-field"><span>{label}</span><input aria-label={label} type={type} value={value ?? ''} required={required} min={min} max={max} onChange={event => onChange(type === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)} />{hint && <small>{hint}</small>}</label>;
 }
@@ -24,7 +21,8 @@ function Windows({ value, onChange, label }) {
 export default function AdminCalendar({ temporaryCalendarAccess = false, services, onDirtyChange, onUnauthenticated, onSaved, onBusyChange }) {
   const [snapshot, setSnapshot] = useState(null), [settings, setSettings] = useState(null), [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false), [occupancyBusy, setOccupancyBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
-  const [month, setMonth] = useState(dateInZone('UTC').slice(0, 7)), [selectedDate, setSelectedDate] = useState('');
+  const [anchor, setAnchor] = useState(dateInZone('UTC')), [view, setView] = useState('month'), [selectedDate, setSelectedDate] = useState('');
+  const [occupancyRecords, setOccupancyRecords] = useState(null);
   const [previewService, setPreviewService] = useState(''), [previewSlots, setPreviewSlots] = useState([]), [previewTimezone, setPreviewTimezone] = useState(''), [previewReady, setPreviewReady] = useState(false), [previewValidity, setPreviewValidity] = useState(null), [slotsLoading, setSlotsLoading] = useState(false), [refresh, setRefresh] = useState(0);
   const lock = useRef(false);
   const handleError = err => { setError(err.message); if (err.status === 401) onUnauthenticated(); };
@@ -75,8 +73,6 @@ export default function AdminCalendar({ temporaryCalendarAccess = false, service
   const catalog = snapshot.serviceCatalog || services;
   const override = settings.overrides.find(item => item.date === selectedDate);
   const overrideMode = !override ? 'weekly' : override.closed ? 'closed' : 'custom';
-  const days = monthBounds(month).to.slice(-2) * 1;
-  const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
   const updateOverride = (mode, windows = []) => edit(next => { next.overrides = next.overrides.filter(item => item.date !== selectedDate); if (mode !== 'weekly') next.overrides.push({ date: selectedDate, closed: mode === 'closed', windows: mode === 'closed' ? [] : windows }); });
   return <div className="admin-calendar">
     {error && <div className="admin-alert admin-error" role="alert">{error}{dirty && <button type="button" className="text-button" onClick={() => { if (confirm('Загрузить сохранённое расписание? Несохранённые изменения будут потеряны.')) read(); }}>Загрузить сохранённое расписание</button>}</div>}
@@ -103,13 +99,11 @@ export default function AdminCalendar({ temporaryCalendarAccess = false, service
         </section>
         <section className="admin-card"><h2>Обычная неделя</h2><p className="calendar-hint">Оставьте выходные без интервалов. Если приём только в отдельные дни, оставьте всю неделю закрытой и откройте нужные даты ниже.</p><div className="calendar-week">{weekdays.map(([day, label]) => <Windows key={day} label={label} value={settings.weeklyHours[day] || []} onChange={value => edit(next => { next.weeklyHours[day] = value; })} />)}</div></section>
         <section className="admin-card"><h2>Отдельные дни</h2><p className="calendar-hint">Выберите дату, чтобы закрыть её или оставить только удобные часы. Эти правила заменяют обычную неделю только для выбранной даты.</p>
-          <Field label="Месяц календаря" type="month" value={month} onChange={value => { if (/^\d{4}-\d{2}$/.test(value)) { setMonth(value); setSelectedDate(''); } }} />
-          <div className="calendar-month" role="group" aria-label="Дни месяца">{['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => <span className="calendar-weekday" key={day}>{day}</span>)}{Array.from({ length: offset }, (_, index) => <span key={`empty-${index}`} />)}{Array.from({ length: days }, (_, index) => {
-            const date = `${month}-${String(index + 1).padStart(2, '0')}`, rule = settings.overrides.find(item => item.date === date);
-            const day = new Date(`${date}T12:00:00Z`).getUTCDay(), open = rule ? !rule.closed && rule.windows.length > 0 : !!settings.weeklyHours[day]?.length;
-            return <button type="button" key={date} aria-pressed={selectedDate === date} aria-label={`${date}, ${open ? 'приём открыт' : 'выходной'}`} className={open ? 'calendar-day open' : 'calendar-day'} onClick={() => setSelectedDate(date)}><strong>{index + 1}</strong><small>{open ? 'Приём' : 'Закрыто'}</small></button>;
-          })}</div>
-          <Field label="Выбранная дата" type="date" value={selectedDate} onChange={value => { setSelectedDate(value); if (value) setMonth(value.slice(0, 7)); }} />
+          <Field label="Месяц календаря" type="month" value={anchor.slice(0,7)} onChange={value=>{if(/^\d{4}-\d{2}$/.test(value)){setAnchor(value+'-01');setView('month');setSelectedDate('');}}}/>
+          <AdminCalendarBoard anchor={anchor} view={view} selectedDate={selectedDate} settings={settings} timezone={settings.timezone}
+            occupancy={limited || dirty || busy || occupancyBusy ? null : occupancyRecords}
+            onNavigate={date=>{setAnchor(date);setSelectedDate('');}} onSelectDate={date=>{setSelectedDate(date);setAnchor(date);}} onChangeView={setView}/>
+          <Field label="Выбранная дата" type="date" value={selectedDate} onChange={value=>{setSelectedDate(value);if(value)setAnchor(value);}} />
           {selectedDate && <div className="calendar-date-editor"><label className="admin-field"><span>Режим дня</span><select value={overrideMode} onChange={event => updateOverride(event.target.value)}><option value="weekly">По обычной неделе</option><option value="closed">Выходной: закрыть день</option><option value="custom">Только выбранные часы</option></select></label>{overrideMode === 'custom' && <Windows label={`Приём ${selectedDate}`} value={override.windows} onChange={value => updateOverride('custom', value)} />}</div>}
         </section>
         <div className="calendar-save"><span>{dirty ? 'Расписание ещё не сохранено' : 'Расписание сохранено'}</span><button type="submit" className="admin-primary" disabled={!dirty || busy || occupancyBusy}>{busy ? 'Сохраняем…' : 'Сохранить расписание'}</button></div>
@@ -124,7 +118,7 @@ export default function AdminCalendar({ temporaryCalendarAccess = false, service
       {previewTimezone && previewTimezone !== settings.timezone && <div className="calendar-warning" role="alert">Часовой пояс был изменён в другой вкладке. Предпросмотр показан в {previewTimezone}. <button type="button" className="text-button" onClick={read}>Загрузить сохранённое расписание</button></div>}
       {dirty ? <p>Сначала сохраните расписание, чтобы проверить время.</p> : slotsLoading ? <p role="status">Рассчитываем время…</p> : !previewService || !selectedDate ? <p>Выберите услугу и дату.</p> : !previewReady ? <p>Свободное время пока нельзя подтвердить. Проверьте опубликованную услугу, рабочие часы и актуальность сверенной занятости за выбранный период.</p> : previewSlots.length ? <ul className="calendar-preview-slots">{previewSlots.map(slot => <li key={slot.start}>{formatAppointment(slot.start, previewTimezone || settings.timezone)}</li>)}</ul> : <p>На эту дату нет доступных интервалов. Проверьте часы, длительность услуги и минимальное время до приёма.</p>}
     </section>
-    <AdminOccupancy key={snapshot.version} blocked={dirty || busy} onUnauthenticated={onUnauthenticated} onBusyChange={setOccupancyBusy} onSaved={(previousVersion, saved) => {
+    <AdminOccupancy key={snapshot.version} blocked={dirty || busy} onUnauthenticated={onUnauthenticated} onBusyChange={setOccupancyBusy} onSnapshot={value=>setOccupancyRecords(value?.occupancy?.records??null)} onSaved={(previousVersion, saved) => {
       setSnapshot(current => current && current.version === previousVersion ? {...current, version:saved.version, settings:saved.settings || current.settings} : current);
       setRefresh(current => current + 1);
       if (saved.settings) onSaved?.(previousVersion, saved);

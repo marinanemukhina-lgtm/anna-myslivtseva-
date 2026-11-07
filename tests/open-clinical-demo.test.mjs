@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { emptyClinicalDemo, exampleClinicalDemo, clinicalStateSchema, addDemoClient, addDemoVisit, setDemoPhoto, restoreClinicalDemo, PERSONAS, NOTES, PROCEDURES } from '../shared/clinical-demo.mjs';
+import { emptyClinicalDemo, exampleClinicalDemo, clinicalStateSchema, addDemoClient, addDemoVisit, setDemoPhoto, addDemoPhoto, updateDemoPhoto, deleteDemoPhoto, deleteDemoClient, restoreClinicalDemo, PERSONAS, NOTES, PROCEDURES } from '../shared/clinical-demo.mjs';
 import { renderPublicPage } from '../server/public-pages.mjs';
 import { initialContent } from '../shared/content.mjs';
 const id = '00000000-0000-4000-8000-000000000100';
@@ -53,4 +53,23 @@ test('dictated text roundtrips without changing photo or client references', () 
  const next=addDemoVisit(s,{clientId:s.clients[0].id,date:'2026-11-06',procedure:PROCEDURES[0],note});
  assert.equal(restoreClinicalDemo(JSON.parse(JSON.stringify(next))).visits.at(-1).note,note);
  assert.deepEqual(next.photos,s.photos); assert.deepEqual(next.clients,s.clients);
+});
+
+test('more than five photos on one visit preserve distinct image IDs and support exact update/delete',()=>{
+  const state=exampleClinicalDemo(), data='data:image/png;base64,iVBORw0KGgo=';
+  const visitId=state.visits[0].id;
+  let next=state;
+  for(let i=0;i<7;i++)next=addDemoPhoto(next,{visitId,angle:'Спереди',data},()=>`00000000-0000-4000-8000-${String(i+200).padStart(12,'0')}`);
+  assert.equal(next.photos.length,7);
+  assert.equal(restoreClinicalDemo(JSON.parse(JSON.stringify(next))).photos.length,7);
+  const changed=updateDemoPhoto(next,next.photos[2],'data:image/jpeg;base64,AAAA');
+  assert.equal(changed.photos[2].data,'data:image/jpeg;base64,AAAA');
+  assert.equal(changed.photos[1].data,data);
+  const deleted=deleteDemoPhoto(changed,changed.photos[2]);
+  assert.equal(deleted.photos.length,6);
+  assert.equal(deleted.photos.some(p=>p.id===changed.photos[2].id),false);
+  const rest=deleteDemoClient(deleted,state.clients[0].id);
+  assert.equal(rest.clients.length,1);
+  assert.equal(rest.photos.length,0);
+  assert.equal(rest.visits.some(v=>v.clientId===state.clients[0].id),false);
 });

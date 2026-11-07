@@ -12,6 +12,7 @@ import Lenis from "lenis";
 import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
 import Booking from "./Booking.jsx";
+import ContactActions from "./ContactActions.jsx";
 import "./styles.css";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
@@ -207,7 +208,7 @@ function Header({ isHome }) {
   return (
     <>
       <header
-        className={`site-header ${scrolled ? "scrolled" : ""}`}
+        className={`site-header ${scrolled || /^\/contact\/?$/.test(path) ? "scrolled" : ""}`}
       >
         <Brand />
         <nav className="header-navigation" aria-label="Разделы сайта">
@@ -970,7 +971,7 @@ function Contact() {
   const p = Object.fromEntries(Object.entries(data.profile).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
   return (
     <>
-      <PageHero first="Запись" last="на приём." />
+      <ContactActions profile={p} />
       <Booking profile={p} />
       <section className="contact-section grid">
         <h2>

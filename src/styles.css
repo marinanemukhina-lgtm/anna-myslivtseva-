@@ -1616,6 +1616,15 @@ html { scroll-padding-top: 110px; }
 .hero-first { min-height: max(650px, calc(100svh - 86px)); height: auto; display: flex; flex-direction: column; justify-content: flex-end; padding: 260px var(--gutter) 30px; position: relative; overflow: hidden; background: #c7bbae; }
 .hero-image { position: absolute; inset: 0; height: 100%; object-position: 50% 0% !important; }
 .hero-shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(9,14,24,.74), rgba(9,14,24,.08) 55%, transparent 75%); }
+@media(min-width:1024px) {
+  .hero-shade::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(90deg, rgba(9,14,24,.68), rgba(9,14,24,.58) 28%, transparent 48%);
+  }
+}
 .hero-title { position: relative; left: auto; bottom: auto; z-index: 1; }
 .hero-title .eyebrow { display: block; margin-bottom: 22px; font-size: 15px; letter-spacing: .14em; }
 .hero-title h1 { display: flex; flex-direction: column; font-size: clamp(84px, 8.6vw, 150px); line-height: .86; letter-spacing: -.045em; }

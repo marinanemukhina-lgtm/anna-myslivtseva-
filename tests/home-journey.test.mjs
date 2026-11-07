@@ -79,3 +79,16 @@ test('hero services CTA reflects only published entries and actual prices', () =
   }
   assert.match(render('', [{ published: true, price: '1000 ₽' }]), /class="hero-services">Услуги и стоимость<\/a>/);
 });
+
+
+test('desktop hero gets a left text scrim without altering the mobile shade or portrait', async () => {
+  // Source guard only; rendered contrast and portrait appearance need CI screenshots.
+  const css = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
+  const desktop = css.match(/@media\(min-width:1024px\)\s*\{\s*\.hero-shade::before\s*\{([^}]+)\}\s*\}/);
+  assert.ok(desktop);
+  assert.match(desktop[1], /pointer-events:\s*none/);
+  assert.match(desktop[1], /linear-gradient\(90deg, rgba\(9,14,24,\.68\), rgba\(9,14,24,\.58\) 28%, transparent 48%\)/);
+  assert.equal((css.match(/\.hero-shade::before/g) || []).length, 1);
+  assert.match(css, /\.hero-shade \{[^}]*linear-gradient\(0deg, rgba\(9,14,24,\.74\), rgba\(9,14,24,\.08\) 55%, transparent 75%\)/);
+  assert.doesNotMatch(desktop[1], /filter:|object-position:|font|transform:/);
+});

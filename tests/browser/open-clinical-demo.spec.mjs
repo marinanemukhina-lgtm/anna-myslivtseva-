@@ -32,3 +32,18 @@ test('open patient histories require no password, persist locally, and can start
   expect(writes).toEqual([]);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+test('six photos can be appended to one visit and one deleted without losing the rest',async ({page})=>{
+ await page.goto('/admin/patients');
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAALUlEQVR4nGPccuISAy0BE01NH7Vg1IJRC0YtGLVg1IJRC6gIAH7ZAo5zVBhDAAAAAElFTkSuQmCC','base64');
+ const input=page.getByLabel('Добавить фото к посещению 2026-10-20');
+ for(let i=0;i<6;i++){
+  await input.setInputFiles({name:`synthetic-${i}.png`,mimeType:'image/png',buffer:png});
+  await expect(page.locator('.clinical-gallery-visit').last().locator('.clinical-gallery-photo')).toHaveCount(i+1);
+ }
+ await page.reload();
+ await expect(page.locator('.clinical-gallery-visit').last().locator('.clinical-gallery-photo')).toHaveCount(6);
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('.clinical-gallery-visit').last().getByRole('button',{name:'Удалить фото'}).first().click();
+ await expect(page.locator('.clinical-gallery-visit').last().locator('.clinical-gallery-photo')).toHaveCount(5);
+});

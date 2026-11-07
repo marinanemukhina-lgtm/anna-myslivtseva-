@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
-import { PERSONAS, PROCEDURES, ANGLES, restoreClinicalDemo, emptyClinicalDemo, exampleClinicalDemo, addDemoClient, addDemoVisit, setDemoPhoto } from '../shared/clinical-demo.mjs';
+import { PERSONAS, PROCEDURES, ANGLES, restoreClinicalDemo, emptyClinicalDemo, exampleClinicalDemo, addDemoClient, addDemoVisit, setDemoPhoto, addDemoPhoto, updateDemoPhoto, deleteDemoPhoto } from '../shared/clinical-demo.mjs';
 import './clinical-demo.css';
 import VoiceNote from './VoiceNote.jsx';
 import { encodeClinicalPhoto } from './clinical-photo.mjs';
+import ClinicalGallery from './ClinicalGallery.jsx';
 const STORAGE = 'anna-open-synthetic-clinical-v1';
 function initial() {
   try { const saved = localStorage.getItem(STORAGE); return saved ? restoreClinicalDemo(JSON.parse(saved)) : exampleClinicalDemo(); }
   catch { return exampleClinicalDemo(); }
 }
-function PhotoPanel({ label, visit, visits, angle, photo, busy, onSelect, onPhoto }) {
+function PhotoPanel({ label, visit, visits, angle, photo, photos, photoKey, busy, onSelect, onPhoto, onPick }) {
   return <div className="clinical-photo-panel">
     <div className="clinical-photo-title"><h3>{label}</h3><label>{label}: посещение<select value={visit?.id ?? ''} disabled={busy || !visits.length} onChange={e=>onSelect(e.target.value)}>{!visits.length && <option value="">Нет посещений</option>}{visits.map(v=><option key={v.id} value={v.id}>{v.date} · {v.procedure}</option>)}</select></label></div>
+    {photos.length>1 && <label>Снимок для сравнения<select aria-label={`Снимок ${label}`} value={photoKey(photo)} disabled={busy} onChange={e=>onPick(e.target.value)}>{photos.map((p,i)=><option key={photoKey(p)} value={photoKey(p)}>Фото №{i+1}</option>)}</select></label>}
     <div className="clinical-photo-frame">{photo ? <img src={photo.data} alt={`Фото ${label.toLowerCase()} · ${angle} · ${visit.date}`}/> : <p>Фото пока не добавлено<span>{angle} · {visit?.date ?? 'Добавьте посещение'}</span></p>}</div>
-    <label className={'clinical-photo-upload clinical-camera-button' + (busy || !visit ? ' disabled' : '')}>Снять фото «{label}»<input type="file" accept="image/*" capture="environment" aria-label={`Снять фото ${label}`} disabled={busy || !visit} onChange={e=>onPhoto(e,visit.id,angle)}/></label>
-    <label className={'clinical-photo-upload' + (busy || !visit ? ' disabled' : '')}>{photo ? 'Заменить' : 'Добавить'} фото «{label}»<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" aria-label={`Добавить фото ${label}`} disabled={busy || !visit} onChange={e=>onPhoto(e,visit.id,angle)}/></label>
+    <label className={'clinical-photo-upload clinical-camera-button' + (busy || !visit ? ' disabled' : '')}>Снять фото «{label}»<input type="file" accept="image/*" capture="environment" aria-label={`Снять фото ${label}`} disabled={busy || !visit} onChange={e=>onPhoto(e,visit.id,angle,photo)}/></label>
+    <label className={'clinical-photo-upload' + (busy || !visit ? ' disabled' : '')}>{photo ? 'Заменить' : 'Добавить'} фото «{label}»<input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" aria-label={`Добавить фото ${label}`} disabled={busy || !visit} onChange={e=>onPhoto(e,visit.id,angle,photo)}/></label>
   </div>;
 }
 export default function ClinicalDemo() {
@@ -22,18 +24,23 @@ export default function ClinicalDemo() {
   const [message, setMessage] = useState(''), [photoBusy,setBusy] = useState(false), [angle,setAngle] = useState(ANGLES[0]);
   const [beforeId,setBeforeId] = useState(''), [afterId,setAfterId] = useState('');
   const [voiceBusy, setVoiceBusy] = useState(false);
+  const [beforePicture,setBeforePicture]=useState(''),[afterPicture,setAfterPicture]=useState('');
   const busy = photoBusy || voiceBusy, note = drafts[selected] ?? '';
   const setNote = value => setDrafts(current => ({...current, [selected]: value}));
   const client = state.clients.find(c => c.id === selected), visits = state.visits.filter(v => v.clientId === selected).sort((a,b)=>a.date.localeCompare(b.date));
   const before = visits.find(v=>v.id===beforeId) ?? visits[0], after = visits.find(v=>v.id===afterId) ?? visits.at(-1);
-  const photo = visit => state.photos.find(p=>p.visitId===visit?.id && p.angle===angle);
+  const photosFor=visit=>state.photos.filter(p=>p.visitId===visit?.id && p.angle===angle);
+  const photoKey=p=>p ? p.id ?? `legacy:${p.visitId}:${p.angle}` : '';
+  const beforePhotos=photosFor(before), afterPhotos=photosFor(after);
+  const beforePhoto=beforePhotos.find(p=>photoKey(p)===beforePicture)??beforePhotos[0];
+  const afterPhoto=afterPhotos.find(p=>photoKey(p)===afterPicture)??afterPhotos[0];
   const unused = PERSONAS.filter(p => !state.clients.some(c => c.label === p));
   function save(next, notice) {
     try { localStorage.setItem(STORAGE, JSON.stringify(next)); }
     catch { setMessage('Не удалось сохранить в хранилище браузера. Старое фото осталось без изменений. Скачайте тестовые истории или освободите место кнопкой «Начать с пустого кабинета».'); return false; }
     setState(next); setMessage(notice + ' Сохранено в этом браузере.'); return true;
   }
-  function choose(id) { setSelected(id);setBeforeId('');setAfterId('');setMessage(''); }
+  function choose(id) { setSelected(id);setBeforeId('');setAfterId('');setBeforePicture('');setAfterPicture('');setMessage(''); }
   function create() {
     try { const next = addDemoClient(state, unused[0]); if(save(next, 'Тестовая карта создана.')) {setSelected(next.clients.at(-1).id);setBeforeId('');setAfterId('');} }
     catch { setMessage('Не удалось добавить тестовую карту. Проверьте список.'); }
@@ -44,18 +51,36 @@ export default function ClinicalDemo() {
     try { const next=addDemoVisit(state, { clientId: selected, date: day, procedure, note }); if(save(next, 'Тестовая процедура добавлена.')) { setAfterId(next.visits.at(-1).id); setNote(''); } }
     catch { setMessage('Проверьте дату и тестовые поля.'); }
   }
-  async function upload(event,visitId,photoAngle) {
-    const input=event.currentTarget, file=input.files?.[0]; input.value=''; if(!file)return;
-    if(!['image/jpeg','image/png','image/webp','image/heic','image/heif'].includes(file.type) || file.size>20*1024*1024) {setMessage('Выберите изображение JPG, PNG, WebP или фото с камеры размером до 20 МБ.');return;}
+  async function processPhoto(file){
+    if(!['image/jpeg','image/png','image/webp','image/heic','image/heif'].includes(file.type)||file.size>20*1024*1024)throw Error('INVALID_PHOTO');
+    const raw=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('PHOTO_READ_FAILED'));reader.readAsDataURL(file);});
+    const img=await new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(Error('PHOTO_DECODE_FAILED'));image.src=raw;});
+    return encodeClinicalPhoto(img);
+  }
+  async function upload(event,visitId,photoAngle,replacingPhoto){
+    const input=event.currentTarget,file=input.files?.[0];input.value='';if(!file)return;
     setBusy(true);
-    try {
-      const raw=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error());reader.readAsDataURL(file);});
-      const img=await new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>reject(Error());image.src=raw;});
-      const data=encodeClinicalPhoto(img);
-      const replacing=state.photos.some(p=>p.visitId===visitId && p.angle===photoAngle);
-      save(setDemoPhoto(state,{visitId,angle:photoAngle,data}), replacing ? 'Тестовое фото заменено.' : 'Тестовое фото добавлено.');
-    } catch (error) {setMessage(error?.message==='PHOTO_TOO_LARGE' ? 'Не удалось уменьшить фото до допустимого размера. Старое фото сохранено. Выберите другой снимок.' : 'Не удалось обработать изображение. Старое фото сохранено. Попробуйте снять фото ещё раз или выбрать JPG / PNG из галереи.');}
-    finally {setBusy(false);}
+    try{
+      const data=await processPhoto(file);
+      const next=replacingPhoto?updateDemoPhoto(state,replacingPhoto,data):setDemoPhoto(state,{visitId,angle:photoAngle,data});
+      save(next,replacingPhoto?'Тестовое фото заменено.':'Тестовое фото добавлено.');
+    }catch(error){setMessage('Не удалось обработать фото. Старое фото не изменено. Попробуйте JPG или PNG из галереи.');}
+    finally{setBusy(false);}
+  }
+  async function uploadMany(event,visitId,photoAngle){
+    const input=event.currentTarget,files=[...(input.files||[])];input.value='';if(!files.length)return;
+    setBusy(true);
+    try{
+      let next=state;
+      for(const file of files)next=addDemoPhoto(next,{visitId,angle:photoAngle,data:await processPhoto(file)});
+      save(next,`Добавлено тестовых фото: ${files.length}.`);
+    }catch(error){setMessage('Не удалось добавить фотографии. Прежние снимки сохранены. Попробуйте выбрать меньше фото или освободить место.');}
+    finally{setBusy(false);}
+  }
+  function removePhoto(photo){
+    if(!confirm('Удалить этот тестовый снимок? Остальные фото останутся.'))return;
+    try{save(deleteDemoPhoto(state,photo),'Тестовый снимок удалён.');}
+    catch{setMessage('Не удалось удалить снимок.');}
   }
   function example() { const next=exampleClinicalDemo();if(save(next,'Пример восстановлен.')){setSelected(next.clients[0].id);setBeforeId('');setAfterId('');} }
   function clear() { if(!confirm('Очистить только тестовые карты и фотографии в этом браузере?'))return;if(save(emptyClinicalDemo(),'Тестовые карты очищены.')) { choose(''); setDrafts({}); } }
@@ -81,10 +106,11 @@ export default function ClinicalDemo() {
         <section className="clinical-card clinical-comparison"><span className="clinical-label">Карта пациента · демо</span><h2>{client.label}</h2><p className="clinical-visit-summary">Посещений: {visits.length}{visits.length ? ` · Последнее: ${visits.at(-1).date}` : ''}</p>
           <div className="clinical-comparison-heading"><h3>Фото до и после</h3><label>Ракурс<select value={angle} disabled={busy} onChange={e=>setAngle(e.target.value)}>{ANGLES.map(a=><option key={a}>{a}</option>)}</select></label></div>
           <p className="clinical-hint">Выберите две даты и одинаковый ракурс для сравнения.</p>
-          <div className="clinical-comparison-grid"><PhotoPanel label="До" visit={before} visits={visits} angle={angle} photo={photo(before)} busy={busy} onSelect={setBeforeId} onPhoto={upload}/><PhotoPanel label="После" visit={after} visits={visits} angle={angle} photo={photo(after)} busy={busy} onSelect={setAfterId} onPhoto={upload}/></div>
+          <div className="clinical-comparison-grid"><PhotoPanel label="До" visit={before} visits={visits} angle={angle} photo={beforePhoto} photos={beforePhotos} photoKey={photoKey} busy={busy} onSelect={id=>{setBeforeId(id);setBeforePicture('');}} onPick={setBeforePicture} onPhoto={upload}/><PhotoPanel label="После" visit={after} visits={visits} angle={angle} photo={afterPhoto} photos={afterPhotos} photoKey={photoKey} busy={busy} onSelect={id=>{setAfterId(id);setAfterPicture('');}} onPick={setAfterPicture} onPhoto={upload}/></div>
           {before && after && before.id===after.id && <p className="clinical-hint">Выбрано одно посещение. Добавьте или выберите другую дату для сравнения.</p>}
         </section>
-        <section className="clinical-card"><h3>История процедур</h3>{[...visits].reverse().map(v=><article className="clinical-visit" key={v.id}><div><strong>{v.date}</strong><span>{v.procedure}</span></div><p>{v.note}</p><div className="clinical-photos">{state.photos.filter(p=>p.visitId===v.id).map(p=><figure key={p.angle}><img src={p.data} alt={`Фото посещения ${v.date} · ${p.angle}`} loading="lazy"/><figcaption>{p.angle}</figcaption></figure>)}</div></article>)}{!visits.length && <p>Пока нет процедур.</p>}</section>
+        <ClinicalGallery visits={visits} photos={state.photos} angle={angle} busy={busy} onAdd={uploadMany} onReplace={upload} onRemove={removePhoto}/>
+        <section className="clinical-card"><h3>История процедур</h3>{[...visits].reverse().map(v=><article className="clinical-visit" key={v.id}><div><strong>{v.date}</strong><span>{v.procedure}</span></div><p>{v.note}</p><div className="clinical-photos">{state.photos.filter(p=>p.visitId===v.id).map(p=><figure key={photoKey(p)}><img src={p.data} alt={`Фото посещения ${v.date} · ${p.angle}`} loading="lazy"/><figcaption>{p.angle}</figcaption></figure>)}</div></article>)}{!visits.length && <p>Пока нет процедур.</p>}</section>
         <section className="clinical-card"><h3>Добавить процедуру</h3><form onSubmit={visit} className="clinical-form">
           <label>Дата<input type="date" value={day} required disabled={busy} onChange={e=>setDay(e.target.value)}/></label>
           <label>Процедура<select value={procedure} disabled={busy} onChange={e=>setProcedure(e.target.value)}>{PROCEDURES.map(x=><option key={x}>{x}</option>)}</select></label>

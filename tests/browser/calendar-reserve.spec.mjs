@@ -1,5 +1,5 @@
 import {test,expect} from '@playwright/test';
-const start='2026-11-10T07:00:00.000Z',date='2026-11-10',serviceId='test-service';
+const date=new Date(Date.now()+10*86400000).toISOString().slice(0,10),start=date+'T07:00:00.000Z',serviceId='test-service';
 const settings={timezone:'Europe/Moscow',services:[{serviceId,durationMinutes:45,bufferMinutes:15,enabled:true}],weeklyHours:{0:[],1:[],2:[],3:[],4:[],5:[],6:[]},overrides:[{date,closed:false,windows:[{start:'10:00',end:'12:00'}]}],slotStepMinutes:15,minNoticeMinutes:0,horizonDays:60};
 async function setup(page,{stale=false}={}){
  await page.goto('/admin');
@@ -11,7 +11,7 @@ async function setup(page,{stale=false}={}){
  await page.route('**/api/admin/booking',route=>route.fulfill({json:config}));
  await page.route('**/api/admin/booking/occupancy',route=>route.fulfill({json:{...config,occupancy:{schemaVersion:1,coverage:null,records:[]}}}));
  await page.route('**/api/admin/booking/free-availability?*',route=>{
-  reads++;return route.fulfill({json:{version:stale&&reads>1?2:1,timezone:'Europe/Moscow',ready:true,observedAt:new Date().toISOString(),validUntil:new Date(Date.now()+60000).toISOString(),slots:[{start,end:'2026-11-10T07:45:00.000Z'}]}});
+  reads++;return route.fulfill({json:{version:stale&&reads>1?2:1,timezone:'Europe/Moscow',ready:true,observedAt:new Date().toISOString(),validUntil:new Date(Date.now()+60000).toISOString(),slots:[{start,end:date+'T07:45:00.000Z'}]}});
  });
  await page.route('**/api/admin/booking/reservations',async route=>{
   const payload=route.request().postDataJSON();writes.push(payload);

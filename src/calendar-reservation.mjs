@@ -2,6 +2,7 @@
 export function reservableSlot(availability,candidate,now=Date.now()){
  if(!availability||availability.ready!==true||!Number.isSafeInteger(availability.version)||availability.version<1)return false;
  if(!Number.isFinite(Date.parse(availability.validUntil))||Date.parse(availability.validUntil)<=now)return false;
+ if(!Number.isFinite(Date.parse(candidate))||Date.parse(candidate)<=now)return false;
  return Array.isArray(availability.slots)&&availability.slots.some(slot=>slot.start===candidate&&Number.isFinite(Date.parse(slot.start)));
 }
 export function makeReservationPayload(availability,serviceId,date,start,operationKey){

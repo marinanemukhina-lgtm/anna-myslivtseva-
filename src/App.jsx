@@ -13,6 +13,9 @@ import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
 import Booking from "./Booking.jsx";
 import ContactActions from "./ContactActions.jsx";
+import SocialLinks from "./SocialLinks.jsx";
+import { contactMethods } from "./contact-methods.mjs";
+import { publicSocialLinks, safePublicUrl } from "../shared/contact-links.mjs";
 import "./styles.css";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
@@ -112,17 +115,18 @@ const nav = [
 function Contacts({ compact = false, profile }) {
   const { data } = useSite();
   const p = profile || data.profile;
-  if (!p.address && !p.phone && !p.email && !p.socialUrl) return null;
+  const { phone, smsHref } = contactMethods(p);
+  if (!p.address && !phone && !p.email && !publicSocialLinks(p).length) return null;
   return (
     <div className={"contacts " + (compact ? "compact" : "")}>
       <div>
         <span>А.</span>
         <p>
           {p.address || "—"}
-          {p.mapUrl && (
+          {safePublicUrl(p.mapUrl) && (
             <>
               <br />
-              <a href={p.mapUrl} target="_blank" rel="noreferrer">
+              <a href={safePublicUrl(p.mapUrl)} target="_blank" rel="noreferrer">
                 Как добраться
               </a>
             </>
@@ -134,25 +138,15 @@ function Contacts({ compact = false, profile }) {
         <p>
           {p.email ? <a href={"mailto:" + p.email}>{p.email}</a> : "—"}
           <br />
-          {p.phone ? (
-            <a href={"tel:" + p.phone.replace(/[^+\d]/g, "")}>{p.phone}</a>
+          {phone ? (
+            <a href={"tel:" + phone}>{p.phone}</a>
           ) : (
             "—"
           )}
         </p>
       </div>
-      <div>
-        <span>С.</span>
-        <p>
-          {p.socialUrl ? (
-            <a href={p.socialUrl} target="_blank" rel="noreferrer">
-              Социальная сеть
-            </a>
-          ) : (
-            "—"
-          )}
-        </p>
-      </div>
+      {smsHref && <div><span>SMS</span><a href={smsHref}>Написать SMS</a></div>}
+      {publicSocialLinks(p).length > 0 && <div><span>С.</span><SocialLinks profile={p} /></div>}
     </div>
   );
 }
@@ -270,7 +264,7 @@ function Footer() {
       <p className="footer-tagline">{data.profile.name}<br /><span>{data.profile.role}</span></p>
       <div className="footer-grid">
         <Contacts />
-        {!data.profile.address && !data.profile.phone && !data.profile.email && !data.profile.socialUrl && <p className="footer-contact-note">Контакты для записи пока не опубликованы.</p>}
+        {!data.profile.address && !contactMethods(data.profile).phone && !data.profile.email && !publicSocialLinks(data.profile).length && <p className="footer-contact-note">Контакты для записи пока не опубликованы.</p>}
         <div className="hours">
           <span className="eyebrow">Часы приёма</span>
           {data.profile.hours ? (
@@ -290,6 +284,7 @@ function Footer() {
         </button>
         <Link to="/admin">Вход</Link>
       </div>
+      <Link to="/contact" className="small-link footer-contact-link">Связаться с Анной</Link>
       <Link to="/contact" className="footer-marquee">
         <span>
           Записаться на приём&nbsp;&nbsp;&nbsp; Записаться на
@@ -332,6 +327,7 @@ function HeroPortrait() {
 function Hero() {
   const { data } = useSite();
   const names = data.profile.name.trim().split(/\s+/);
+  const services = data.services.filter(service => service.published);
   return (
     <section className="home-hero">
       <div className="hero-first">
@@ -340,6 +336,11 @@ function Hero() {
         <div className="hero-title">
           <span className="eyebrow">{data.profile.role}</span>
           <h1><span>{names[0]}</span><span>{names.slice(1).join(" ")}</span></h1>
+          {data.profile.address && <p className="hero-location pre-line">{data.profile.address}</p>}
+          <div className="hero-actions">
+            <Link to="/contact" className="hero-contact">Связаться с Анной</Link>
+            {services.length > 0 && <Link to="/services" className="hero-services">{services.some(service => service.price.trim()) ? "Услуги и стоимость" : "Услуги"}</Link>}
+          </div>
         </div>
         <div className="hero-bottom">
           <Link to="/diplomas" className="hero-document-link">Образование и дипломы</Link>
@@ -347,15 +348,11 @@ function Hero() {
         </div>
       </div>
       <nav className="hero-chapters" aria-label="Навигация первого экрана">
-        <Link to="/about"><span>01</span> Об Анне</Link>
-        <Link to="/services"><span>02</span> Услуги и цены</Link>
+        <Link to="/services"><span>01</span> Услуги и цены</Link>
+        <Link to="/about"><span>02</span> Об Анне</Link>
         <Link to="/diplomas"><span>03</span> Дипломы</Link>
         <Link to="/contact"><span>04</span> Запись на приём</Link>
       </nav>
-      <div className="hero-second">
-        <Video />
-        <div className="film-caption"><span className="eyebrow">Анна Мысливцева</span><p>В процессе<br />работы.</p><span className="eyebrow">Остеопатия</span></div>
-      </div>
     </section>
   );
 }
@@ -382,125 +379,6 @@ function Intro() {
         <Link to="/contact" className="small-link">
           Записаться на приём
         </Link>
-      </div>
-    </section>
-  );
-}
-function FourSteps() {
-  const { data, motion } = useSite();
-  const [active, setActive] = useState(0),
-    [pause, setPause] = useState(false);
-  const start = useRef(0),
-    content = useRef(null);
-  useLayoutEffect(() => {
-    const el = content.current;
-    const resize = new ResizeObserver(() =>
-      el.parentElement.style.setProperty(
-        "--steps-height",
-        el.offsetHeight + "px",
-      ),
-    );
-    resize.observe(el);
-    return () => resize.disconnect();
-  }, []);
-  const steps = [
-    {
-      title: "Об Анне",
-      body: "Знакомство со специалистом: биография, образование и профессиональный путь.",
-      to: "/about",
-      image: data.profile.portrait,
-    },
-    {
-      title: "Услуги и цены",
-      body: "Направления работы, описание приёмов, их продолжительность и стоимость.",
-      to: "/services",
-      image: "/media/session-neutral-01.jpg",
-    },
-    {
-      title: "Дипломы",
-      body: "Дипломы и сертификаты — отдельная коллекция документов с просмотром в полном размере.",
-      to: "/diplomas",
-      image: data.profile.portrait,
-    },
-    {
-      title: "Запись на приём",
-      body: "Контакты, адрес и время приёма — всё необходимое, чтобы связаться с Анной.",
-      to: "/contact",
-      image: "/media/session-neutral-02.jpg",
-    },
-  ];
-  useEffect(() => {
-    if (!motion || pause) return;
-    const t = setInterval(() => setActive((v) => (v + 1) % 4), 5000);
-    return () => clearInterval(t);
-  }, [motion, pause]);
-  return (
-    <section
-      className="steps"
-      onMouseEnter={() => setPause(true)}
-      onMouseLeave={() => setPause(false)}
-      onFocus={() => setPause(true)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setPause(false);
-      }}
-      onTouchStart={(e) => (start.current = e.touches[0].clientX)}
-      onTouchEnd={(e) => {
-        const delta = e.changedTouches[0].clientX - start.current;
-        if (Math.abs(delta) > 35)
-          setActive((v) => (v + (delta < 0 ? 1 : 3)) % 4);
-      }}
-    >
-      <div className="steps-content" ref={content}>
-        <div className="step-heading">
-          <span
-            aria-hidden="true"
-            key={active}
-            className="step-progress"
-            style={{
-              "--progress-from": active / 4,
-              "--progress-to": (active + 1) / 4,
-              animationPlayState: pause || !motion ? "paused" : "running",
-            }}
-          />
-          <span>{active + 1} : 4</span>
-          <h2 className="eyebrow">Знакомство</h2>
-          <div className="step-controls">
-            {steps.map((_, i) => (
-              <button
-                key={i}
-                className={active === i ? "selected" : ""}
-                aria-label={`Слайд ${i + 1}`}
-                aria-pressed={active === i}
-                onClick={() => setActive(i)}
-              />
-            ))}
-          </div>
-        </div>
-        <div className="step-track">
-          {steps.map((s, i) => (
-            <article
-              key={s.to}
-              className={`step ${i === active ? "active" : ""}`}
-            >
-              <button
-                className="step-picture"
-                onClick={() => setActive(i)}
-                aria-label={s.title}
-              >
-                <img src={s.image} alt="" loading="lazy" />
-              </button>
-              <div className="step-copy">
-                <span>({i + 1}).</span>
-                <div>
-                  <h3>
-                    <Link to={s.to}>{s.title}</Link>
-                  </h3>
-                  <p>{s.body}</p>
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
       </div>
     </section>
   );
@@ -599,11 +477,13 @@ function Home() {
     <>
       <Hero />
       <Intro />
-      <FourSteps />
-      <FullMedia />
+      <div className="hero-second">
+        <Video />
+        <div className="film-caption"><span className="eyebrow">{data.profile.name}</span><p>В процессе<br />работы.</p><span className="eyebrow">{data.profile.role}</span></div>
+      </div>
+      <EducationFeature />
       <Editorial />
       <Feature />
-      <EducationFeature />
       <FullMedia single />
       <Editorial kind="approach" />
       {(data.news.length > 0 || data.offers.length > 0) && (
@@ -626,7 +506,13 @@ function Home() {
         </div>
       )}
       {!data.news.length && !data.offers.length && <JournalLinks />}
-      <PageLinks />
+      <section className="home-next editorial grid" aria-labelledby="home-next-title">
+        <h2 id="home-next-title">Связаться с Анной</h2>
+        <div>
+          <p>Чтобы обсудить запись или задать организационный вопрос, выберите удобный способ связи.</p>
+          <Link to="/contact" className="text-action">Перейти к контактам <span aria-hidden="true">↗</span></Link>
+        </div>
+      </section>
     </>
   );
 }
@@ -986,16 +872,16 @@ function Contact() {
               <p className="pre-line">{p.hours}</p>
             </>
           )}
-          {p.bookingUrl ? (
+          {safePublicUrl(p.bookingUrl) ? (
             <a
               className="solid-link"
-              href={p.bookingUrl}
+              href={safePublicUrl(p.bookingUrl)}
               target="_blank"
               rel="noreferrer"
             >
               Записаться на приём
             </a>
-          ) : !p.phone && !p.email && !p.socialUrl ? (
+          ) : !contactMethods(p).phone && !p.email && !publicSocialLinks(p).length ? (
             <Empty>Контакты для записи скоро появятся.</Empty>
           ) : null}
         </div>

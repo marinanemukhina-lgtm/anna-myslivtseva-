@@ -3,6 +3,7 @@ import { mergeSavedPayload } from "../shared/admin-save.mjs";
 import { useSite } from "./App.jsx";
 import "./admin.css";
 import { profileDraft, socialChannels } from "../shared/anna-materials.mjs";
+import { socialLink, updateSocialProfile } from "../shared/contact-links.mjs";
 import AdminCalendar from "./AdminCalendar.jsx";
 import { mergeScheduleSave } from "./booking-client.mjs";
 const tabs = [
@@ -545,12 +546,14 @@ export default function Admin() {
           <section className="admin-card">
             <h2>Соцсети Анны</h2>
             <p>Адреса страниц и каналов. Сохранение ссылки не подключает аккаунт и не включает отправку сообщений.</p>
+            <ol className="social-setup-steps"><li>Когда канал будет создан, скопируйте его публичную ссылку в Telegram: например, https://t.me/channel_name (пример формата).</li><li>Вставьте ссылку в поле Telegram ниже и нажмите «Сохранить изменения».</li><li>Откройте сайт: кнопка канала появится в контактах, меню и подвале. Чтобы убрать её, очистите поле и сохраните.</li></ol>
+            <p>Для Telegram укажите публичную ссылку именно своего канала, не ссылку на личный профиль или приглашение. Для VK, Instagram и MAX подойдёт ссылка на свою официальную страницу, для WhatsApp — на свой контакт или канал. Пароли и коды здесь не нужны. Сайт проверяет формат адреса, но не владельца и тип аккаунта.</p>
             <div className="admin-fields">
-              {socialChannels.map(([key,label]) => <Field key={key} label={label + " · ссылка"} type="url"
+              {socialChannels.map(([key,label]) => <Field key={key} label={(key === "telegram" ? "Telegram · канал" : label) + " · ссылка"} type="url"
                 value={payload.data.profile.socialLinks?.[key] ?? ""}
-                onChange={value => changeProfile("socialLinks", {...payload.data.profile.socialLinks, [key]:value})}
-                hint={payload.data.profile.socialLinks?.[key] ? "Ссылка указана в редакторе. Автопостинг не подключён." : "Адрес пока не указан."}/>)}
-              <Field label="Основная ссылка на соцсеть" type="url" value={payload.data.profile.socialUrl} onChange={value => changeProfile("socialUrl",value)} hint="Эта ссылка используется в публичных контактах сайта."/>
+                onChange={value => change(d => { d.profile = updateSocialProfile(d.profile, key, value); })}
+                hint={payload.data.profile.socialLinks?.[key] ? (socialLink(key, payload.data.profile.socialLinks[key]) ? "После сохранения ссылка появится в контактах, меню и подвале всех страниц. Автопостинг не подключён." : "Укажите HTTPS-ссылку на страницу этого сервиса. Некорректный адрес не показывается на сайте.") : "Пустое поле скрыто на сайте."}/>)}
+              <Field label="Основная ссылка на соцсеть" type="url" value={payload.data.profile.socialUrl} onChange={value => changeProfile("socialUrl",value.trim())} hint="Дополнительная ссылка в контактах, меню и подвале. Совпадающий адрес показывается один раз."/>
             </div>
             <p><a href="/admin/marketing">Перейти к маркетинговому плану</a></p>
           </section>

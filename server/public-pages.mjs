@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { readContent } from './db.mjs';
 import { initialContent, publicContent } from '../shared/content.mjs';
+import { publicSocialLinks } from '../shared/contact-links.mjs';
+import { contactMethods } from '../src/contact-methods.mjs';
 const origin = 'https://anna-myslivtseva.vercel.app';
 const titles = {'/':'Анна Мысливцева · Остеопат','/services':'Услуги и цены','/about':'Об Анне','/news':'Новости','/offers':'Акции','/diplomas':'Образование и дипломы','/contact':'Запись на приём','/privacy':'Конфиденциальность','/terms':'Условия'};
 export const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -18,7 +20,13 @@ export function renderPublicPage(template, pathname, raw) {
   let content = '';
   const paragraphs = values => values.filter(Boolean).map(x => `<p>${escapeHtml(x)}</p>`).join('');
   if (pathname === '/' || pathname === '/about') content = paragraphs([p.name,p.role,p.intro,p.about,p.philosophy,p.approach,p.qualification]);
-  if (pathname === '/contact') content = paragraphs([p.phone,p.email,p.address,p.hours]);
+  if (pathname === '/contact') {
+    content = paragraphs([p.email,p.address,p.hours]);
+    const {phone, displayPhone, smsHref} = contactMethods(p);
+    if (phone) content += `<p><a href="tel:${escapeHtml(phone)}">Позвонить Анне: ${escapeHtml(displayPhone)}</a></p>`;
+    if (smsHref) content += `<p><a href="${escapeHtml(smsHref)}">Написать SMS</a></p>`;
+    content += publicSocialLinks(p).map(({label,href}) => `<p><a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a></p>`).join('');
+  }
   if (['/privacy','/terms'].includes(pathname)) content = paragraphs([p[parts[0]]]);
   const items = article ? [article] : data[parts[0]];
   if (Array.isArray(items)) content += items.map(x => `<section><h2>${escapeHtml(x.title)}</h2>${paragraphs([x.body,x.price,x.duration,x.issuer,x.year])}${['news','offers'].includes(parts[0]) ? `<a href="/${parts[0]}/${encodeURIComponent(x.id)}">Подробнее</a>` : ''}</section>`).join('');

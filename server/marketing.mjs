@@ -1,3 +1,4 @@
+import { publicSocialLinks } from '../shared/contact-links.mjs';
 import { readFile } from 'node:fs/promises';
 import { profileDraft, socialChannels, editorialPlan } from '../shared/anna-materials.mjs';
 import { database, readContent } from './db.mjs';
@@ -49,7 +50,7 @@ export function registerMarketing(app,requireAdmin,requireWorkspace = requireAdm
   app.get('/api/admin/marketing/seed',requireWorkspace,(_req,res)=>res.json(marketingSeed()));
   app.get('/api/admin/marketing/materials',requireWorkspace,async(_req,res,next)=>{try{
     const {data}=await readContent();
-    res.json({profile:{name:data.profile.name,role:data.profile.role,intro:data.profile.intro,about:data.profile.about,qualification:data.profile.qualification,socialUrl:data.profile.socialUrl,socialLinks:data.profile.socialLinks || {}},diplomas:data.diplomas,profileDraft,socialChannels,editorialPlan,publishingEnabled:false});
+    res.json({publicSocialLinks:publicSocialLinks(data.profile),profile:{name:data.profile.name,role:data.profile.role,intro:data.profile.intro,about:data.profile.about,qualification:data.profile.qualification,socialUrl:data.profile.socialUrl,socialLinks:data.profile.socialLinks || {}},diplomas:data.diplomas,profileDraft,socialChannels,editorialPlan,publishingEnabled:false});
   }catch(e){next(e);}});
   app.get('/api/admin/marketing',requireWorkspace,async(_req,res,next)=>{try{
     const {query}=await database();

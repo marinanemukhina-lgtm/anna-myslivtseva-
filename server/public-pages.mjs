@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { readContent } from './db.mjs';
 import { initialContent, publicContent } from '../shared/content.mjs';
-import { publicSocialLinks } from '../shared/contact-links.mjs';
+import { publicSocialLinks, safePublicUrl } from '../shared/contact-links.mjs';
 import { contactMethods } from '../src/contact-methods.mjs';
 const origin = 'https://anna-myslivtseva.vercel.app';
 const titles = {'/':'Анна Мысливцева · Остеопат','/services':'Услуги и цены','/about':'Об Анне','/news':'Новости','/offers':'Акции','/diplomas':'Образование и дипломы','/contact':'Запись на приём','/privacy':'Конфиденциальность','/terms':'Условия'};
@@ -21,7 +21,11 @@ export function renderPublicPage(template, pathname, raw) {
   const paragraphs = values => values.filter(Boolean).map(x => `<p>${escapeHtml(x)}</p>`).join('');
   if (pathname === '/' || pathname === '/about') content = paragraphs([p.name,p.role,p.intro,p.about,p.philosophy,p.approach,p.qualification]);
   if (pathname === '/contact') {
-    content = paragraphs([p.email,p.address,p.hours]);
+    content = paragraphs([p.address?.trim(),p.hours?.trim()]);
+    if (p.email?.trim()) content += `<p><a href="mailto:${escapeHtml(p.email.trim())}">${escapeHtml(p.email.trim())}</a></p>`;
+    const map = safePublicUrl(p.mapUrl), booking = safePublicUrl(p.bookingUrl);
+    if (map) content += `<p><a href="${escapeHtml(map)}" target="_blank" rel="noopener noreferrer">Как добраться</a></p>`;
+    if (booking) content += `<p><a href="${escapeHtml(booking)}" target="_blank" rel="noopener noreferrer">Записаться на приём</a></p>`;
     const {phone, displayPhone, smsHref} = contactMethods(p);
     if (phone) content += `<p><a href="tel:${escapeHtml(phone)}">Позвонить Анне: ${escapeHtml(displayPhone)}</a></p>`;
     if (smsHref) content += `<p><a href="${escapeHtml(smsHref)}">Написать SMS</a></p>`;

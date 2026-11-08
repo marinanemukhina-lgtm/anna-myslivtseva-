@@ -53,6 +53,9 @@ for (const width of [320,390,1440]) {
     await expect(page).toHaveURL(/\/$/);
     await page.goto('/services');
     await expect(footerChannel).toHaveAttribute('href',telegram);
+    const footerPhone = page.locator('footer a[href="tel:+79000000001"]');
+    await expect(footerPhone).toBeVisible();
+    expect(await footerPhone.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
     await page.locator('.footer-contact-link').click();
     await expect(page).toHaveURL(/\/contact$/);
     await page.reload();
@@ -63,20 +66,16 @@ for (const width of [320,390,1440]) {
     expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     if (width <= 390) {
       await page.evaluate(() => document.fonts.ready);
-      const footerGrid = await page.locator('.footer-grid').boundingBox();
-      const footerContacts = await page.locator('footer .contacts').boundingBox();
-      expect(Math.abs(footerContacts.width - footerGrid.width)).toBeLessThanOrEqual(1);
-      for (const scope of ['.contact-section', 'footer']) {
-        const labels = page.locator(`${scope} .contacts > div > span`).filter({hasText:/^SMS$/});
-        const phone = page.locator(`${scope} .contacts a[href="tel:+79000000001"]`);
-        for (const text of [labels, phone]) {
-          await expect(text).toBeVisible();
-          expect(await text.evaluate(element => {
-            const range = document.createRange();
-            range.selectNodeContents(element);
-            return range.getClientRects().length;
-          })).toBe(1);
-        }
+      await expect(page.locator('footer .contacts, .contact-section')).toHaveCount(0);
+      const phone = page.locator('.contact-primary span').last();
+      const sms = page.locator('.contact-intro a[href="sms:+79000000001"]');
+      for (const text of [phone, sms]) {
+        await expect(text).toBeVisible();
+        expect(await text.evaluate(element => {
+          const range = document.createRange();
+          range.selectNodeContents(element.firstChild);
+          return [...range.getClientRects()].filter(rect => rect.width > 0).map(rect => Math.round(rect.y)).filter((y, index, values) => values.indexOf(y) === index).length;
+        })).toBe(1);
       }
     }
 

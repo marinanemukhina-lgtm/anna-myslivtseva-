@@ -39,3 +39,16 @@ test('trailing-slash normalization never redirects to another origin', async () 
   assert.equal(result.status,308); assert.equal(result.location,'/example.com');
  } finally { await new Promise(resolve => server.close(resolve)); }
 });
+
+
+test('server contact fallback keeps actionable published details and rejects unsafe destinations', () => {
+ const raw=structuredClone(initialContent);
+ Object.assign(raw.profile,{phone:'+79000000001',email:' anna@example.invalid ',address:'Тестовый <адрес>',hours:'Тестовые часы',mapUrl:'https://example.invalid/map',bookingUrl:'https://example.invalid/book'});
+ const html=renderPublicPage(template,'/contact',raw).html;
+ for(const href of ['tel:+79000000001','sms:+79000000001','mailto:anna@example.invalid','https://example.invalid/map','https://example.invalid/book']) assert.ok(html.includes(`href="${href}"`));
+ assert.match(html,/Тестовый &lt;адрес&gt;/);
+ assert.match(html,/Тестовые часы/);
+ assert.doesNotMatch(html,/Онлайн-календарь|<form|<input|>—</);
+ raw.profile.mapUrl='javascript:alert(1)';raw.profile.bookingUrl='https://user:secret@example.invalid/book';
+ assert.doesNotMatch(renderPublicPage(template,'/contact',raw).html,/javascript:|user:secret/);
+});

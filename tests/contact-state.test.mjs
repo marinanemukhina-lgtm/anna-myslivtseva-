@@ -2,51 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { build, transform } from 'esbuild';
+import { build } from 'esbuild';
 import React from 'react';
-import { contactMethods } from '../src/contact-methods.mjs';
-import { publicSocialLinks, safePublicUrl } from '../shared/contact-links.mjs';
 import { renderToStaticMarkup } from 'react-dom/server';
-
-const source = fs.readFileSync('src/Booking.jsx', 'utf8');
-const transformed = await transform(source
-  .replace("import React from 'react';", '')
-  .replace("import './booking.css';", '')
-  .replace("import { contactMethods } from './contact-methods.mjs';", '')
-  .replace("import { publicSocialLinks, safePublicUrl } from '../shared/contact-links.mjs';", '')
-  .replace('export default function Booking', 'function Booking'), { loader: 'jsx' });
-const Booking = new Function('React', 'contactMethods', 'publicSocialLinks', 'safePublicUrl', transformed.code + ';return Booking;')(React, contactMethods, publicSocialLinks, safePublicUrl);
-const availableMessage = 'Для записи воспользуйтесь контактами ниже.';
-const unavailableMessage = 'Контакты для записи ещё не опубликованы.';
-
-for (const [name, profile, available] of [
-  ['empty', {}, false],
-  ['whitespace', { phone: '  ', email: '\t', socialUrl: '\n', bookingUrl: ' ' }, false],
-  ['address alone', { address: 'Synthetic address' }, false],
-  ['phone', { phone: ' +79000000001 ' }, true],
-  ['invalid phone', {phone: '+000'}, false],
-  ['structured social', {socialLinks:{telegram:'https://t.me/synthetic'}}, true],
-  ['email', { email: ' test@example.invalid ' }, true],
-  ['social', { socialUrl: ' https://example.invalid ' }, true],
-  ['booking', { bookingUrl: ' https://example.invalid/book ' }, true],
-]) {
-  test(`booking notice: ${name}`, () => {
-    const html = renderToStaticMarkup(React.createElement(Booking, { profile }));
-    assert.equal(html.includes(availableMessage), available);
-    assert.equal(html.includes(unavailableMessage), !available);
-    assert.ok(!html.includes('<form'));
-  });
-}
-test('default booking notice does not promise a working calendar', () => {
-  const html = renderToStaticMarkup(React.createElement(Booking));
-  assert.ok(html.includes('Онлайн-запись пока не открыта.'));
-});
 
 // Render the real Contact tree with a CMS context, stubbing only browser animation setup.
 fs.mkdirSync('.qa', { recursive: true });
 await build({
   stdin: {
-    contents: fs.readFileSync('src/App.jsx', 'utf8') + '\nexport {Contact, Site};',
+    contents: fs.readFileSync('src/App.jsx', 'utf8') + '\nexport {Contact, Footer, Site};',
     resolveDir: path.resolve('src'),
     loader: 'jsx',
   },
@@ -67,7 +31,7 @@ await build({
   loader: { '.css': 'empty' },
   outfile: '.qa/contact-render.mjs',
 });
-const { Contact, Site } = await import('../.qa/contact-render.mjs');
+const { Contact, Footer, Site } = await import('../.qa/contact-render.mjs');
 const renderContact = profile => renderToStaticMarkup(React.createElement(Site.Provider, {
   value: { data: { profile }, navigate: () => {}, motion: false },
 }, React.createElement(Contact)));
@@ -82,8 +46,8 @@ for (const [name, profile, href] of [
     const html = renderContact(profile);
     assert.ok(html.includes(`href="${href}"`));
     assert.ok(!html.includes('Контакты для записи скоро появятся.'));
-    assert.ok(html.includes(availableMessage));
-    assert.ok(!html.includes(unavailableMessage));
+    assert.ok(!html.includes('Онлайн-календарь'));
+    assert.equal((html.match(/class="contact-intro"/g) || []).length, 1);
     assert.ok(!html.includes('<form'));
   });
 }
@@ -94,12 +58,39 @@ for (const [name, profile] of [
 ]) {
   test(`contact integration: ${name} does not suggest unavailable contact methods`, () => {
     const html = renderContact(profile);
-    assert.ok(html.includes(unavailableMessage));
-    assert.ok(html.includes('Контакты для записи скоро появятся.'));
-    assert.ok(!html.includes(availableMessage));
+    assert.ok(html.includes('Телефон для связи пока не опубликован.'));
+    assert.ok(!html.includes('Онлайн-календарь'));
     assert.ok(!html.includes('href="tel:'));
     assert.ok(!html.includes('href="mailto:'));
     assert.ok(!html.includes('Социальная сеть'));
     assert.ok(!html.includes('<form'));
   });
 }
+
+
+const renderFooter = (profile, path = '/') => renderToStaticMarkup(React.createElement(Site.Provider, {
+  value: {data: {profile}, path, navigate: () => {}, motion: false, setMotion: () => {}},
+}, React.createElement(Footer)));
+test('footer completes the contact page without repeating its actions or details', () => {
+  const profile = {name: 'Имя из CMS',role: 'Роль из CMS',phone: '+79000000001',address: 'Тестовый адрес',hours: 'Тестовые часы',socialLinks:{telegram:'https://t.me/synthetic'}};
+  for (const path of ['/contact','/contact/']) {
+    const html = renderFooter(profile,path);
+    assert.doesNotMatch(html, /tel:|sms:|Тестовый адрес|Тестовые часы|footer-invitation|footer-marquee/);
+    for (const href of ['/diplomas','/privacy','/terms','/admin']) assert.ok(html.includes(`href="${href}"`));
+    assert.match(html, /Имя из CMS/);
+    assert.match(html, /Роль из CMS/);
+    assert.match(html, /Анимация: выкл/);
+  }
+  const regular = renderFooter(profile);
+  for (const value of ['tel:+79000000001','sms:+79000000001','Тестовый адрес','Тестовые часы','https://t.me/synthetic']) assert.ok(regular.includes(value));
+  assert.equal((regular.match(/class="footer-contact-link"/g) || []).length, 1);
+  assert.doesNotMatch(regular, /footer-marquee|>А\.<|>К\.<|>С\.<|>—</);
+});
+test('empty footer does not render placeholder contact rows or hours', () => {
+  const html = renderFooter({name: 'Анна',phone:' ',address:' ',email:' ',hours:' '});
+  assert.doesNotMatch(html, /class="contacts|class="hours|Часы приёма|>—</);
+  assert.match(html, /Контакты для записи пока не опубликованы/);
+  const bookingOnly = renderFooter({name: 'Анна', bookingUrl: 'https://example.invalid/book'});
+  assert.doesNotMatch(bookingOnly, /Контакты для записи пока не опубликованы/);
+  assert.match(bookingOnly, /class="footer-contact-link"/);
+});

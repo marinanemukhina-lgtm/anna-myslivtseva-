@@ -16,6 +16,7 @@
     "prebuild": "node scripts/restore-media.mjs",
     "predev": "node scripts/restore-media.mjs",
     "test:browser": "playwright test",
+    "test:composition": "playwright test --config playwright.composition.config.mjs",
     "pretest": "node scripts/restore-media.mjs",
     "dev:booking-demo": "node scripts/synthetic-booking-demo.mjs",
     "test:booking-demo": "node --test tests/synthetic-booking-demo.test.mjs",

@@ -184,11 +184,12 @@ test('preview uses its returned timezone when saved settings changed elsewhere',
   await expect(page.locator('.calendar-preview-slots li').first()).toContainText('11:00');
 });
 
-base('contact has an honest unavailable state and no personal-data form', async ({ page }) => {
+base('contact makes no calendar promise and has no personal-data form', async ({ page }) => {
   const writes = [];
   page.on('request', request => { if (request.url().includes('/api/booking/') && request.method() !== 'GET') writes.push(request.url()); });
   await page.goto('/contact');
-  await expect(page.locator('.booking-unavailable')).toContainText('пока не открыт');
-  await expect(page.locator('.booking-section input')).toHaveCount(0);
+  await expect(page.locator('.contact-intro')).toBeVisible();
+  await expect(page.locator('.booking-section, .booking-unavailable, form, input')).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText('Удобное время для вас');
   expect(writes).toEqual([]);
 });

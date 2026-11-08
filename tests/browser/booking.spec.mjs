@@ -42,13 +42,13 @@ test('schedule saves chosen days, previews only allowed times and survives reloa
   await page.getByLabel(`Длительность: ${service.title}`, { exact: true }).fill('45');
   await page.getByLabel(`Перерыв после: ${service.title}`, { exact: true }).fill('15');
   await page.getByLabel('Включить в расписание', { exact: true }).check();
-  await page.getByRole('button', { name: 'Добавить интервал : Понедельник', exact: true }).click();
+  await page.getByRole('button', { name: 'Добавить интервал: Понедельник', exact: true }).click();
   await page.getByLabel('Понедельник: начало 1', { exact: true }).fill('09:00');
   await page.getByLabel('Понедельник: конец 1', { exact: true }).fill('11:00');
   const date = tomorrow();
   await page.getByLabel('Выбранная дата', { exact: true }).fill(date);
   await page.getByRole('combobox', { name: 'Режим дня', exact: true }).selectOption('custom');
-  await page.getByRole('button', { name: `Добавить интервал : Приём ${date}`, exact: true }).click();
+  await page.getByRole('button', { name: `Добавить интервал: Приём ${date}`, exact: true }).click();
   await page.getByLabel(`Приём ${date}: начало 1`, { exact: true }).fill('10:00');
   await page.getByLabel(`Приём ${date}: конец 1`, { exact: true }).fill('12:00');
   let writes = 0;
@@ -81,9 +81,9 @@ test('unchecking an unconfigured service allows other schedule edits to save', a
   await page.getByLabel('Включить в расписание', { exact: true }).check();
   await page.getByLabel('Включить в расписание', { exact: true }).uncheck();
   await page.getByLabel('Часовой пояс', { exact: true }).fill('Europe/Moscow');
-  await page.getByRole('button', { name: 'Добавить интервал : Понедельник', exact: true }).click();
+  await page.getByRole('button', { name: 'Добавить интервал: Понедельник', exact: true }).click();
   await page.getByLabel('Понедельник: начало 1', { exact: true }).fill('23:00');
-  await page.getByRole('checkbox', { name: 'До конца дня (24:00) : Понедельник, интервал 1', exact: true }).check();
+  await page.getByRole('checkbox', { name: 'До конца дня (24:00): Понедельник, интервал 1', exact: true }).check();
   await page.getByRole('button', { name: 'Сохранить расписание', exact: true }).click();
   await expect(page.getByRole('status')).toContainText('Расписание сохранено');
   const saved = await prepared.get('/api/admin/booking');

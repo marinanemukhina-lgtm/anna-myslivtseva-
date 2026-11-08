@@ -74,3 +74,20 @@ The seven real Contact integration cases remain. Backend intake, availability an
 ## Release gate
 
 No local browser is launched because that route was previously denied. No new rendered screenshots are claimed. Do not describe the implementation as visually verified until permitted CI has run for the exact candidate commit and its images have been reviewed. Do not publish or deploy this branch as part of QA. Backend, credentials, databases, PR20/21 and other projects are outside this change.
+
+## First PR24 CI and follow-up corrections
+
+The first remote candidate `b7b9b709f3eebb701f0ada256b985ae71d3819c2` (same tree as the local recovery candidate) did not pass CI. Desktop reduced-motion captures confirmed the improved single contact composition, but did not establish tablet/mobile or whole-site approval.
+
+Two failures were investigated without launching a local browser:
+
+- Back from contact to the home footer restored 2512 px instead of the saved 2590 px and stayed there. The trace confirms this in reduced motion, so it is not only a Lenis issue. The restoration code accepted any clamped result and cleared its pending target after one synchronous remount layout. The exact asset or layout responsible for the 78 px difference is not established by the old trace.
+- Calendar tests used four exact accessible-name strings with an extra space before a colon. These strings already existed in base `d376302`; they were not introduced by the recovery. The locators now match the unchanged AdminCalendar labels.
+
+The follow-up retains a pending target when the browser cannot yet reach it, retries after layout/media changes and one animation frame, uses the current Lenis instance, and cancels on user input or another route. Observers, listeners and timers are removed on success or after a five-second ceiling for genuinely shorter content. Six explicit unit regressions cover clamping, successful completion, cancellation, current Lenis, focus and bounded cleanup. They are included in `npm test`. Browser position tolerances are unchanged; the next CI attaches before/immediate/frame/finished geometry with the requested position.
+
+The visible header booking label now has a flex gap and the explicit accessible name “Запись на приём”, including on narrow screens. Sparse home content now uses a compact two-route surface instead of a repeated filler portrait and a large empty education promotion. Unpublished documents are described honestly. Without published approach text, both real clips share a heading without an empty text column. Published intro, biography, qualification, approach and document content remains available. The introduction anchor and first-screen diploma access remain.
+
+Composition `maxFailures: 0` allows every viewport to produce diagnostic results while preserving a failed exit status. All captures remain synthetic and clearly named.
+
+Fresh follow-up local checks: `npm test` 204 tests, 203 passed, 1 optional PostgreSQL skip, 0 failures; production build passed; Sites 4/4; compiled booking worker passed; discovery 260 + 56; diff-check passed. No new browser execution or visual approval is claimed. A second exact-commit CI run and full-page/bottom image review are required.

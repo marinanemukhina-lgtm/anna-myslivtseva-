@@ -1,6 +1,7 @@
 :root { --section-space: clamp(56px, 7vw, 104px); --surface: #edf1f6; }
 .arrow-icon { flex: 0 0 auto; width: 18px; height: 18px; vertical-align: middle; }
 .site-header .brand { flex-shrink: 0; }
+.site-header .book-link { gap: .3em; }
 .header-navigation { align-items: center; }
 .header-navigation a { white-space: nowrap; padding-block: 10px; }
 .site-header .menu-trigger, .site-header .book-link { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
@@ -163,4 +164,37 @@
   .feature-copy h2 { font-size: 46px; }
   .feature-small { grid-column: 1; grid-row: 2; }
   .feature-big { grid-column: 2; grid-row: 2; }
+}
+
+/* Sparse CMS content uses useful transitions, not oversized empty proof sections. */
+.home-overview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 36px;
+  margin: var(--section-space) var(--gutter);
+  padding: clamp(24px, 3.2vw, 46px);
+  border: 1px solid #dce1e8;
+  border-radius: 24px;
+  background: var(--surface);
+}
+.intro-summary, .education-summary { margin: var(--section-space) var(--gutter); max-width: 900px; }
+.home-overview > section { margin: 0; max-width: none; display: flex; flex-direction: column; align-items: flex-start; }
+.intro-summary h2, .education-summary h2 { font-size: clamp(32px, 3vw, 46px); }
+.intro-summary p, .education-summary p { margin-top: 18px; max-width: 48ch; font-size: 15px; }
+.home-overview .text-action { margin-top: auto; padding-top: 24px; min-width: min(100%, 280px); }
+.home-overview h2 { margin-bottom: 18px; }
+.home-overview p { margin-top: 0; margin-bottom: 20px; }
+.feature-no-copy { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 1000px; margin-inline: auto; padding-inline: var(--gutter); }
+.feature-no-copy .feature-copy { grid-column: 1/-1; grid-row: 1; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 0; }
+.feature-no-copy .feature-copy h2 { margin: 0; font-size: clamp(38px, 4vw, 58px); }
+.feature-no-copy .feature-copy .text-action { margin: 0; flex-shrink: 0; }
+.feature-no-copy .feature-small { grid-column: 1; grid-row: 2; }
+.feature-no-copy .feature-big { grid-column: 2; grid-row: 2; }
+@media (max-width: 700px) {
+  .home-overview { grid-template-columns: minmax(0, 1fr); gap: 28px; border-radius: 18px; }
+  .home-overview > section + section { padding-top: 28px; border-top: 1px solid #ccd4e2; }
+  .home-overview h2 { margin-bottom: 12px; }
+  .home-overview .text-action { margin-top: 8px; padding-top: 12px; width: 100%; }
+  .feature-no-copy .feature-copy { display: block; }
+  .feature-no-copy .feature-copy .text-action { margin-top: 12px; max-width: none; }
 }

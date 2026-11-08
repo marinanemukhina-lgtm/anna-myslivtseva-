@@ -4,6 +4,25 @@ import { initialContent } from '../../shared/content.mjs';
 const address = 'Ростов-на-Дону. Выезд на дом по предварительной записи.';
 const phone = '+7 (900) 000-00-01';
 async function fixture(page, filled = false) {
+  await page.addInitScript(() => {
+    const nativeScrollTo = window.scrollTo.bind(window);
+    window.__qaScrollRestoration = [];
+    window.scrollTo = (...args) => {
+      const result = nativeScrollTo(...args);
+      const requestedY = typeof args[0] === 'object' ? args[0]?.top : args[1];
+      const record = phase => {
+        window.__qaScrollRestoration.push({
+          phase, requestedY, actualY: window.scrollY,
+          scrollHeight: document.documentElement.scrollHeight, innerHeight: innerHeight,
+          path: location.pathname + location.hash, time: performance.now(),
+        });
+        if (window.__qaScrollRestoration.length > 100) window.__qaScrollRestoration.shift();
+      };
+      record('scrollTo-return');
+      requestAnimationFrame(() => record('scrollTo-next-frame'));
+      return result;
+    };
+  });
   const data = structuredClone(initialContent);
   Object.assign(data.profile, { phone, address, socialLinks: {} });
   // Production-shaped is deliberately sparse. Rich data must not disguise empty composition.
@@ -42,6 +61,11 @@ async function noOverflow(page) {
     expect(box.x, selector).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width, selector).toBeLessThanOrEqual(page.viewportSize().width + 1);
     expect(await element.evaluate(el => el.scrollWidth <= el.clientWidth + 1), selector).toBe(true);
+  }
+  const book = page.locator('.site-header .book-link');
+  await expect(book).toHaveAccessibleName('Запись на приём');
+  if (await book.locator('span').isVisible()) {
+    expect(await book.evaluate(el => parseFloat(getComputedStyle(el).columnGap))).toBeGreaterThanOrEqual(3);
   }
   const items = await page.locator('.site-header > *').evaluateAll(elements => elements.map(el => el.getBoundingClientRect()).filter(r => r.width && r.height).sort((a,b) => a.x-b.x).map(r => ({ x:r.x, right:r.right })));
   for (let i=1; i<items.length; i++) expect(items[i].x).toBeGreaterThanOrEqual(items[i-1].right + 4);
@@ -122,7 +146,9 @@ for (const reducedMotion of ['reduce', 'no-preference']) {
     expect(await page.evaluate(() => Boolean(document.activeElement.closest('main')))).toBe(true);
     await ready(page, '/');
     await expect(page.locator(reducedMotion === 'reduce' ? '.motion-off' : '.motion-on')).toHaveCount(1);
-    await expect(page.locator('.hero-services, .home-next, .journal-links')).toHaveCount(0);
+    await expect(page.locator('.hero-services, .home-next, .journal-links, .intro-thumb, .education-feature')).toHaveCount(0);
+    await expect(page.locator('.home-overview')).toContainText('Документы об образовании пока не опубликованы.');
+    await expect(page.locator('.feature-no-copy video')).toHaveCount(2);
     const frame = await page.locator('.hero-portrait-frame').boundingBox();
     expect(frame.y).toBeGreaterThanOrEqual((await page.locator('.site-header').boundingBox()).height);
     expect(frame.y + frame.height).toBeLessThanOrEqual(page.viewportSize().height);
@@ -149,15 +175,43 @@ for (const reducedMotion of ['reduce', 'no-preference']) {
     await expect(page.locator('footer .footer-contact-link')).toHaveCount(1);
     await noOverflow(page);
     await capture(page, info, `home-production-shaped-synthetic-phone-${reducedMotion}`);
-    const before = await page.evaluate(() => window.scrollY);
+    const restoration = [];
+    const measureRestoration = async label => restoration.push(await page.evaluate(label => ({
+      label, actualY: window.scrollY, scrollHeight: document.documentElement.scrollHeight,
+      innerHeight: window.innerHeight,
+      sections: [...document.querySelectorAll('main > *, footer')].map(el => ({
+        className: el.className, top: el.getBoundingClientRect().top + window.scrollY,
+        height: el.getBoundingClientRect().height,
+      })),
+      media: [...document.querySelectorAll('main img, main video:not([aria-hidden="true"])')].map(el => ({
+        src: el.getAttribute('src'), complete: el.complete, readyState: el.readyState,
+        height: el.getBoundingClientRect().height,
+      })),
+    }), label));
+    await measureRestoration('before-contact');
+    const before = restoration[0].actualY;
     expect(before).toBeGreaterThan(page.viewportSize().height);
     await page.locator('.site-header .book-link').click();
     await expect(page).toHaveURL(/\/contact$/);
     await topIsVisible(page);
     await page.goBack();
     await expect(page).toHaveURL(/\/$/);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before - 5);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(before + 5);
+    try {
+      await measureRestoration('back-immediate');
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+      await measureRestoration('back-animation-frame');
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before - 5);
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(before + 5);
+    } finally {
+      await measureRestoration('back-finished');
+      await info.attach('back-restoration-geometry', {
+        body: JSON.stringify({
+          requestedY: before, samples: restoration,
+          scrollCalls: await page.evaluate(() => window.__qaScrollRestoration),
+        }, null, 2),
+        contentType: 'application/json',
+      });
+    }
     await page.goForward();
     await expect(page).toHaveURL(/\/contact$/);
     await topIsVisible(page);

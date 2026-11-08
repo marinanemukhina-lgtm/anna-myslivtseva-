@@ -3,6 +3,7 @@ import base from './playwright.config.mjs';
 
 export default defineConfig({
   ...base,
+  maxFailures: 0,
   testDir: './tests/composition',
   outputDir: '.qa/composition',
   reporter: [['list'], ['html', { outputFolder: '.qa/composition-report', open: 'never' }]],

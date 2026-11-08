@@ -12,6 +12,7 @@ import Lenis from "lenis";
 import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
 import ArrowIcon from "./ArrowIcon.jsx";
+import { restorePageScroll } from "./scroll-restoration.mjs";
 import ContactActions from "./ContactActions.jsx";
 import SocialLinks from "./SocialLinks.jsx";
 import { contactMethods } from "./contact-methods.mjs";
@@ -195,7 +196,7 @@ function Header({ isHome }) {
         >
           Меню
         </button>
-        <Link className="small-link book-link" to="/contact">
+        <Link className="small-link book-link" to="/contact" aria-label="Запись на приём">
           Запись<span> на приём</span>
         </Link>
       </header>
@@ -330,6 +331,11 @@ function Hero() {
 }
 function Intro() {
   const { data } = useSite();
+  if (!data.profile.intro?.trim() && !data.profile.about?.trim()) return <section className="intro-summary" id="introduction">
+    <h2>Об Анне</h2>
+    {data.profile.qualification?.trim() && <p className="pre-line">{data.profile.qualification}</p>}
+    <Link to="/about" className="text-action">Информация о специалисте <ArrowIcon /></Link>
+  </section>;
   return (
     <section className="intro grid" id="introduction">
       <Portrait className="intro-thumb" loading="lazy" />
@@ -346,7 +352,7 @@ function Intro() {
         <p>
           {data.profile.about
             ? data.profile.about.split("\n")[0]
-            : "Анна Мысливцева — остеопат. Здесь собраны сведения о специалисте, образовании, услугах и стоимости приёма."}
+            : "Для вопросов о приёме выберите удобный способ связи с Анной."}
         </p>
         <Link to="/contact" className="small-link">
           Записаться на приём
@@ -408,11 +414,12 @@ function Editorial({ kind = "philosophy" }) {
 }
 function Feature() {
   const { data } = useSite();
-  return <section className="feature grid">
+  const hasApproach = Boolean(data.profile.approach?.trim());
+  return <section className={"feature grid" + (hasApproach ? "" : " feature-no-copy")}>
     <div className="feature-copy">
-      <span className="eyebrow">В процессе работы</span>
-      <h2 className="reveal">За каждым<br />приёмом —<br />человек.</h2>
-      <p>{data.profile.approach || "Познакомьтесь с Анной: биография и сведения об образовании собраны на отдельной странице."}</p>
+      {hasApproach && <span className="eyebrow">В процессе работы</span>}
+      <h2 className="reveal">{hasApproach ? <>За каждым<br />приёмом —<br />человек.</> : "В процессе работы."}</h2>
+      {hasApproach && <p>{data.profile.approach}</p>}
       <Link to="/about" className="text-action">Об Анне <ArrowIcon /></Link>
     </div>
     <div className="feature-small"><Video second /></div>
@@ -443,8 +450,10 @@ function Home() {
   return (
     <>
       <Hero />
-      <Intro />
-      <EducationFeature />
+      {!data.profile.intro?.trim() && !data.profile.about?.trim() && !data.diplomas.length ? <div className="home-overview">
+        <Intro />
+        <EducationFeature />
+      </div> : <><Intro /><EducationFeature /></>}
       {data.profile.philosophy && <Editorial />}
       <Feature />
       {(data.news.length > 0 || data.offers.length > 0) && (
@@ -471,10 +480,15 @@ function Home() {
 }
 function EducationFeature() {
   const { data } = useSite();
+  if (!data.diplomas.length) return <section className="education-summary">
+    <h2>Образование и дипломы</h2>
+    <p>Документы об образовании пока не опубликованы.</p>
+    <Link to="/diplomas" className="text-action">Открыть раздел <ArrowIcon /></Link>
+  </section>;
   return <section className="education-feature grid">
     <div className="education-heading"><span className="eyebrow">Образование и квалификация</span><h2 className="reveal">Образование<br />и дипломы.</h2></div>
     <div className="education-description"><p>Дипломы и сертификаты Анны — в отдельном разделе. Каждый опубликованный документ можно рассмотреть в полном размере.</p><Link to="/diplomas" className="text-action">Посмотреть дипломы <ArrowIcon /></Link></div>
-    <div className="education-foot"><span>{data.profile.name}</span><span>{data.diplomas.length ? `${data.diplomas.length} документов` : "Образование · Дипломы · Сертификаты"}</span></div>
+    <div className="education-foot"><span>{data.profile.name}</span><span>{`${data.diplomas.length} документов`}</span></div>
   </section>;
 }
 function JournalLinks() {
@@ -937,12 +951,15 @@ export default function App() {
     const anchor = typeof target === "object" ? document.getElementById(target.hash.slice(1)) : null;
     // A cold deep link can arrive before its CMS-backed section is mounted.
     if (typeof target === "object" && !anchor && !ready) return;
-    const top = typeof target === "number" ? target : anchor ? Math.max(0, anchor.getBoundingClientRect().top + window.scrollY - parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop || "0")) : 0;
-    lenis.current?.resize();
-    lenis.current?.scrollTo(top, { immediate: true, force: true });
-    window.scrollTo({ top, left: 0, behavior: "instant" });
-    if (anchor?.id === "main") anchor.focus({ preventScroll: true });
-    pendingScroll.current = null;
+    return restorePageScroll({
+      root: root.current,
+      top: () => typeof target === "number" ? target : anchor ? Math.max(0, anchor.getBoundingClientRect().top + window.scrollY - parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop || "0")) : 0,
+      getLenis: () => lenis.current,
+      focusTarget: anchor?.id === "main" ? anchor : null,
+      onFinish: () => {
+        if (pendingScroll.current === target) pendingScroll.current = null;
+      },
+    });
   }, [path, entryTransition, ready]);
   const navigate = (to) => {
     const url = new URL(to, window.location.href);

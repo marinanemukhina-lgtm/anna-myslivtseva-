@@ -46,18 +46,48 @@ for (const reducedMotion of ['reduce', 'no-preference']) {
     const routes = ['/', '/contact', ...([320, 390, 768].includes(page.viewportSize().width) ? ['/about', '/diplomas'] : [])];
     for (const path of routes) {
       await page.goto(path);
-      const contact = page.locator(path === '/contact' ? '.contact-primary' : 'footer .contacts');
+      const contact = page.locator(path === '/contact' ? 'main .contact-actions' : 'footer .contacts');
+      await expect(contact).toHaveCount(1);
       await expect(contact.getByText(phone, { exact: true })).toBeVisible();
       await expect(page.locator(reducedMotion === 'reduce' ? '.motion-off' : '.motion-on')).toHaveCount(1);
-      await expect(page.locator('a[href="tel:+79085023853"]')).toHaveCount(1);
-      await expect(page.locator('a[href="sms:+79085023853"]')).toHaveCount(1);
+      for (const href of ['tel:+79085023853', 'sms:+79085023853']) {
+        const action = contact.locator(`a[href="${href}"]`);
+        await expect(action).toHaveCount(1);
+        await expect(action).toBeVisible();
+      }
+      await expect(contact.locator('a')).toHaveCount(2);
+      if (path === '/contact') await expect(page.locator('footer a[href^="tel:"], footer a[href^="sms:"]')).toHaveCount(0);
       await expect(page.locator('form, input, textarea')).toHaveCount(0);
-      await expect(page.locator('main .hours, main .social-links, main .contact-email')).toHaveCount(0);
+      await expect(page.locator('main, footer').locator('.hours, .social-links, .contact-email, .contact-map, a[href^="mailto:"]')).toHaveCount(0);
       if (path === '/') {
         if (reducedMotion === 'reduce') expect(await page.locator('.hero-portrait-video').evaluate(video => video.paused)).toBe(true);
         else await expect(page.locator('.hero-portrait-video')).toHaveClass(/is-playing/);
       }
       await capture(page, info, `${path === '/' ? 'home' : path.slice(1)}-published-snapshot-${reducedMotion}`);
+      if (path === '/') {
+        // The menu intentionally has its own contact links. Check its purpose and visibility separately.
+        const panel = page.locator('.menu-panel');
+        const trigger = page.getByRole('button', { name: 'Меню', exact: true });
+        await expect(panel).toHaveAttribute('aria-hidden', 'true');
+        await expect(panel).toHaveAttribute('inert', '');
+        await trigger.click();
+        await expect(panel).toHaveAttribute('aria-hidden', 'false');
+        await expect(panel).not.toHaveAttribute('inert', '');
+        const menuContacts = panel.locator('.contacts');
+        const menuPhone = menuContacts.getByRole('link', { name: phone, exact: true });
+        const menuSms = menuContacts.getByRole('link', { name: 'Написать SMS', exact: true });
+        for (const [action, href] of [[menuPhone, 'tel:+79085023853'], [menuSms, 'sms:+79085023853']]) {
+          await expect(action).toHaveCount(1);
+          await expect(action).toBeVisible();
+          await expect(action).toHaveAttribute('href', href);
+        }
+        await expect(menuContacts.locator('a')).toHaveCount(2);
+        await expect(panel.locator('.hours, .social-links, .contact-email, .contact-map, a[href^="mailto:"]')).toHaveCount(0);
+        await page.keyboard.press('Escape');
+        await expect(panel).toHaveAttribute('aria-hidden', 'true');
+        await expect(panel).toHaveAttribute('inert', '');
+        await expect(trigger).toBeFocused();
+      }
     }
     expect(errors).toEqual([]);
     expect(forbiddenRequests).toEqual([]);

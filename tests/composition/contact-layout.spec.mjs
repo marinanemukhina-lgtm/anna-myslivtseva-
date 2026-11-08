@@ -1,0 +1,307 @@
+import { test, expect } from '@playwright/test';
+import { initialContent } from '../../shared/content.mjs';
+import { capture, renderedBounds } from './capture.mjs';
+
+const address = 'Ростов-на-Дону. Выезд на дом по предварительной записи.';
+const phone = '+7 (900) 000-00-01';
+async function fixture(page, filled = false) {
+  await page.addInitScript(() => {
+    const nativeScrollTo = window.scrollTo.bind(window);
+    window.__qaScrollRestoration = [];
+    window.scrollTo = (...args) => {
+      const result = nativeScrollTo(...args);
+      const requestedY = typeof args[0] === 'object' ? args[0]?.top : args[1];
+      const record = phase => {
+        window.__qaScrollRestoration.push({
+          phase, requestedY, actualY: window.scrollY,
+          scrollHeight: document.documentElement.scrollHeight, innerHeight: innerHeight,
+          path: location.pathname + location.hash, time: performance.now(),
+        });
+        if (window.__qaScrollRestoration.length > 100) window.__qaScrollRestoration.shift();
+      };
+      record('scrollTo-return');
+      requestAnimationFrame(() => record('scrollTo-next-frame'));
+      return result;
+    };
+  });
+  const data = structuredClone(initialContent);
+  Object.assign(data.profile, { phone, address, socialLinks: {} });
+  // Production-shaped is deliberately sparse. Rich data must not disguise empty composition.
+  if (filled) Object.assign(data.profile, {
+    email: 'anna@example.invalid', hours: 'Пн–Пт: 10:00–18:00\nПо предварительной записи',
+    mapUrl: 'https://example.invalid/map', bookingUrl: 'https://example.invalid/booking',
+    socialLinks: { telegram: 'https://t.me/synthetic_anna_channel', vk: 'https://vk.com/synthetic_anna' },
+  });
+  await page.route('**/api/content', route => route.fulfill({ json: data }));
+  const errors = [], writes = [], intake = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('request', request => {
+    if (!['GET', 'HEAD'].includes(request.method())) writes.push(request.url());
+    if (/^\/api\/(contact|booking)\//.test(new URL(request.url()).pathname)) intake.push(request.url());
+  });
+  return { errors, writes, intake };
+}
+async function ready(page, path) {
+  await page.goto(path);
+  await expect(page.locator(path === '/contact' ? '.contact-primary' : 'footer .contacts').getByText(phone, { exact: true })).toBeVisible();
+  await page.evaluate(() => document.fonts.ready);
+  await expect(page.locator('.page-enter')).toHaveCSS('opacity', '1');
+}
+async function topIsVisible(page) {
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
+  const header = await page.locator('.site-header').boundingBox();
+  const heading = await page.locator('#contact-title').boundingBox();
+  expect(heading.y).toBeGreaterThanOrEqual(header.y + header.height + 12);
+}
+async function noOverflow(page) {
+  await renderedBounds(page);
+  for (const selector of ['.site-header .brand', '.site-header .book-link', '.site-header .menu-trigger', '.contact-actions', '.footer-surface']) {
+    const element = page.locator(selector);
+    if (!(await element.count())) continue;
+    const box = await element.boundingBox();
+    expect(box.x, selector).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, selector).toBeLessThanOrEqual(page.viewportSize().width + 1);
+    expect(await element.evaluate(el => el.scrollWidth <= el.clientWidth + 1), selector).toBe(true);
+  }
+  const book = page.locator('.site-header .book-link');
+  await expect(book).toHaveAccessibleName('Запись на приём');
+  if (await book.locator('span').isVisible()) {
+    expect(await book.evaluate(el => parseFloat(getComputedStyle(el).columnGap))).toBeGreaterThanOrEqual(3);
+  }
+  const items = await page.locator('.site-header > *').evaluateAll(elements => elements.map(el => el.getBoundingClientRect()).filter(r => r.width && r.height).sort((a,b) => a.x-b.x).map(r => ({ x:r.x, right:r.right })));
+  for (let i=1; i<items.length; i++) expect(items[i].x).toBeGreaterThanOrEqual(items[i-1].right + 4);
+}
+for (const reducedMotion of ['reduce', 'no-preference']) {
+  for (const filled of [false, true]) {
+    test(`contact ${filled ? 'synthetic-filled' : 'production-shaped-synthetic-phone'} / motion ${reducedMotion}`, async ({ page }, info) => {
+      await page.emulateMedia({ reducedMotion });
+      const observed = await fixture(page, filled);
+      await ready(page, '/contact');
+      await topIsVisible(page);
+      await expect(page.locator(reducedMotion === 'reduce' ? '.motion-off' : '.motion-on')).toHaveCount(1);
+      await noOverflow(page);
+      await expect(page.locator('main h1')).toHaveCount(1);
+      await expect(page.locator('.contact-intro')).toHaveCount(1);
+      await expect(page.locator('.booking-section, .contact-section, .footer-marquee, footer .contacts, footer .footer-contact-link')).toHaveCount(0);
+      await expect(page.locator('main')).not.toContainText('Онлайн-календарь');
+      await expect(page.locator('.contact-visit')).toContainText(address);
+      const call = page.locator('main a[href="tel:+79000000001"]');
+      const sms = page.locator('main a[href="sms:+79000000001"]');
+      for (const action of [call, sms]) {
+        await expect(action).toHaveCount(1);
+        expect((await action.boundingBox()).height).toBeGreaterThanOrEqual(44);
+      }
+      await expect(sms.locator('svg')).toHaveCount(1);
+      await expect(sms).not.toContainText('↗');
+      if (!filled) {
+        await expect(page.locator('.contact-intro a')).toHaveCount(2);
+        await expect(page.locator('main .hours, main .social-links, main .contact-email')).toHaveCount(0);
+      } else {
+        await expect(page.locator('main a[href="mailto:anna@example.invalid"]')).toBeVisible();
+        await expect(page.locator('main .hours')).toContainText('Пн–Пт');
+        await expect(page.locator('main .social-links a')).toHaveCount(2);
+        await expect(page.locator('main a[href="https://example.invalid/map"]')).toBeVisible();
+        await expect(page.locator('main a[href="https://example.invalid/booking"]')).toBeVisible();
+      }
+      const portrait = page.locator('.contact-portrait img');
+      await expect(portrait).toBeVisible();
+      await expect.poll(() => portrait.evaluate(el => el.complete && el.naturalWidth > 0)).toBe(true);
+      const section = await page.locator('.contact-intro').boundingBox();
+      const visit = await page.locator('.contact-visit').boundingBox();
+      const footer = await page.locator('.footer-surface').boundingBox();
+      expect(section.y + section.height - visit.y - visit.height).toBeLessThanOrEqual(58);
+      expect(footer.y - section.y - section.height).toBeLessThanOrEqual(2);
+      expect((await page.locator('footer').boundingBox()).height).toBeLessThan(page.viewportSize().width <= 700 ? 520 : 400);
+      if (!filled) expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBeLessThan(page.viewportSize().width <= 700 ? 2100 : 1500);
+      await call.focus();
+      await page.keyboard.press('Tab');
+      await expect(sms).toBeFocused();
+      await expect(page.locator('form, input, textarea')).toHaveCount(0);
+      for (const href of ['/diplomas','/privacy','/terms','/admin']) await expect(page.locator(`footer a[href="${href}"]`)).toHaveCount(1);
+      await expect(page.locator('footer button')).toHaveText(`Анимация: ${reducedMotion === 'reduce' ? 'выкл.' : 'вкл.'}`);
+      await capture(page, info, `contact-${filled ? 'synthetic-filled' : 'production-shaped-synthetic-phone'}-${reducedMotion}`);
+      expect(observed).toEqual({ errors: [], writes: [], intake: [] });
+    });
+  }
+  test(`production-shaped-synthetic-phone full home, bottom navigation, Back and Forward / motion ${reducedMotion}`, async ({ page }, info) => {
+    await page.emulateMedia({ reducedMotion });
+    const observed = await fixture(page);
+    await ready(page, '/');
+    await page.keyboard.press('Tab');
+    await expect(page.locator('.skip-link')).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('main')).toBeFocused();
+    await page.keyboard.press('Tab');
+    expect(await page.evaluate(() => Boolean(document.activeElement.closest('main')))).toBe(true);
+    await ready(page, '/');
+    await expect(page.locator(reducedMotion === 'reduce' ? '.motion-off' : '.motion-on')).toHaveCount(1);
+    await expect(page.locator('.hero-services, .home-next, .journal-links, .intro-thumb, .education-feature')).toHaveCount(0);
+    await expect(page.locator('.home-overview')).toContainText('Документы об образовании пока не опубликованы.');
+    await expect(page.locator('.feature-no-copy video')).toHaveCount(2);
+    const frame = await page.locator('.hero-portrait-frame').boundingBox();
+    expect(frame.y).toBeGreaterThanOrEqual((await page.locator('.site-header').boundingBox()).height);
+    expect(frame.y + frame.height).toBeLessThanOrEqual(page.viewportSize().height);
+    await expect(page.locator('.hero-portrait-frame img')).toHaveCSS('object-fit', 'contain');
+    await expect(page.locator('.portrait-motion-toggle')).toBeVisible();
+    const control = await page.locator('.portrait-motion-toggle').boundingBox();
+    expect(control.y).toBeGreaterThan(frame.y + frame.height / 2);
+    expect(control.y + control.height).toBeLessThanOrEqual(frame.y + frame.height);
+
+    if (reducedMotion === 'reduce') expect(await page.locator('.hero-portrait-video').evaluate(video => video.paused)).toBe(true);
+    else await expect(page.locator('.hero-portrait-video')).toHaveClass(/is-playing/);
+    for (const selector of ['.hero-contact', '.hero-document-link']) {
+      const box = await page.locator(selector).boundingBox();
+      expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize().height);
+    }
+    // Hash changes are distinct history entries even when pathname stays '/'.
+    await page.locator('.hero-scroll').click();
+    await expect(page).toHaveURL(/\/#introduction$/);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+    const introScroll = await page.evaluate(() => window.scrollY);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
+    await page.goForward();
+    await expect(page).toHaveURL(/\/#introduction$/);
+    await expect.poll(() => page.evaluate(target => Math.abs(window.scrollY - target), introScroll)).toBeLessThan(5);
+    await page.goBack();
+    await expect(page.locator('footer .footer-contact-link')).toHaveCount(1);
+    await noOverflow(page);
+    await capture(page, info, `home-production-shaped-synthetic-phone-${reducedMotion}`);
+    const restoration = [];
+    const measureRestoration = async label => restoration.push(await page.evaluate(label => ({
+      label, actualY: window.scrollY, scrollHeight: document.documentElement.scrollHeight,
+      innerHeight: window.innerHeight,
+      sections: [...document.querySelectorAll('main > *, footer')].map(el => ({
+        className: el.className, top: el.getBoundingClientRect().top + window.scrollY,
+        height: el.getBoundingClientRect().height,
+      })),
+      media: [...document.querySelectorAll('main img, main video:not([aria-hidden="true"])')].map(el => ({
+        src: el.getAttribute('src'), complete: el.complete, readyState: el.readyState,
+        height: el.getBoundingClientRect().height,
+      })),
+    }), label));
+    await measureRestoration('before-contact');
+    const before = restoration[0].actualY;
+    expect(before).toBeGreaterThan(0);
+    expect(Math.abs(before - (restoration[0].scrollHeight - restoration[0].innerHeight))).toBeLessThanOrEqual(5);
+    await page.locator('.site-header .book-link').click();
+    await expect(page).toHaveURL(/\/contact$/);
+    await topIsVisible(page);
+    await page.goBack();
+    await expect(page).toHaveURL(/\/$/);
+    try {
+      await measureRestoration('back-immediate');
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
+      await measureRestoration('back-animation-frame');
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(before - 5);
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(before + 5);
+    } finally {
+      await measureRestoration('back-finished');
+      await info.attach('back-restoration-geometry', {
+        body: JSON.stringify({
+          requestedY: before, samples: restoration,
+          scrollCalls: await page.evaluate(() => window.__qaScrollRestoration),
+        }, null, 2),
+        contentType: 'application/json',
+      });
+    }
+    await page.goForward();
+    await expect(page).toHaveURL(/\/contact$/);
+    await topIsVisible(page);
+    await page.goBack();
+    await page.locator('.footer-contact-link').click();
+    await expect(page).toHaveURL(/\/contact$/);
+    await topIsVisible(page);
+    // Repeated route changes must not complete an older smooth scroll on the new page.
+    await page.locator('.site-header .brand').click();
+    await page.locator('.site-header .book-link').click();
+    await topIsVisible(page);
+    const menu = page.getByRole('button', { name: 'Меню', exact: true });
+    await menu.click();
+    await page.keyboard.press('Escape');
+    await expect(menu).toBeFocused();
+    await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+    await page.locator('.site-header .book-link').click();
+    await topIsVisible(page);
+    await noOverflow(page);
+    expect(observed).toEqual({ errors: [], writes: [], intake: [] });
+  });
+  test(`production-shaped-synthetic-phone services, about and diplomas / motion ${reducedMotion}`, async ({ page }, info) => {
+    await page.emulateMedia({ reducedMotion });
+    const observed = await fixture(page);
+    for (const path of ['/services', '/about', '/diplomas']) {
+      await ready(page, path);
+      await expect(page.locator('main h1')).toBeVisible();
+      await noOverflow(page);
+      if (path === '/services') {
+        await expect(page.locator('main')).toContainText('Перечень услуг и цены скоро появятся.');
+        await expect(page.locator('main video, .service-section')).toHaveCount(0);
+        expect((await page.locator('main').boundingBox()).height).toBeLessThan(page.viewportSize().height);
+      }
+      if (path === '/about') {
+        await expect(page.locator('main img')).toHaveCount(1);
+        await expect(page.locator('main a[href="/about"], .about-portrait, .page-links')).toHaveCount(0);
+        await expect(page.locator('main')).toContainText('Биография Анны пока не опубликована.');
+      }
+      if (path === '/diplomas') {
+        await expect(page.locator('.documents-hero, main a[href="/diplomas#documents"]')).toHaveCount(0);
+        await expect(page.locator('main')).toContainText('Документы об образовании пока не опубликованы.');
+      }
+      await capture(page, info, `${path.slice(1)}-production-shaped-synthetic-phone-${reducedMotion}`);
+      await page.locator('footer .footer-contact-link').click();
+      await topIsVisible(page);
+    }
+    // Published documents keep the original gallery and same-path hash history regression.
+    const documented = structuredClone(initialContent);
+    Object.assign(documented.profile, { phone, address, socialLinks: {} });
+    documented.diplomas = [{ id: 'synthetic-document', title: 'Синтетический документ для проверки перехода', body: 'Синтетический текст для проверки позиции опубликованного документа. '.repeat(20), image: '', issuer: '', year: '', fileType: 'image', published: true }];
+    await page.route('**/api/content', route => route.fulfill({ json: documented }));
+    await ready(page, '/diplomas');
+    await expect(page.locator('.diploma-grid')).toContainText('Синтетический документ');
+    await page.locator('a[href="/diplomas#documents"]').click();
+    await expect(page).toHaveURL(/\/diplomas#documents$/);
+    const y = await page.evaluate(() => window.scrollY);
+    await page.goBack();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
+    await page.goForward();
+    await expect.poll(() => page.evaluate(target => Math.abs(window.scrollY - target), y)).toBeLessThan(5);
+    await noOverflow(page);
+    // Hydration can either mount an anchor or move an existing sparse-state anchor.
+    const delayed = structuredClone(initialContent);
+    Object.assign(delayed.profile, { phone, address, socialLinks: {} });
+    delayed.services = [{ id: 'synthetic-service', title: 'Тестовая услуга', body: 'Синтетическое описание для проверки навигации.', image: '', price: '', duration: '', category: '', published: true }];
+    for (const scenario of [
+      {path: '/services#services', anchor: '#services', data: delayed},
+      {path: '/diplomas#documents', anchor: '#documents', data: documented},
+    ]) {
+      let release;
+      const gate = new Promise(resolve => { release = resolve; });
+      await page.route('**/api/content', async route => {
+        await gate;
+        await route.fulfill({ json: scenario.data });
+      });
+      await page.goto(scenario.path);
+      if (scenario.anchor === '#services') await expect(page.locator(scenario.anchor)).toHaveCount(0);
+      else await expect(page.locator('.documents-summary')).toHaveCount(1);
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
+      release();
+      if (scenario.anchor === '#documents') await expect(page.locator('.diploma-grid')).toBeVisible();
+      await expect(page.locator(scenario.anchor)).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+      const position = () => page.locator(scenario.anchor).evaluate(element => {
+        const requested = Math.max(0, element.getBoundingClientRect().top + scrollY - parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop));
+        const expected = Math.min(requested, Math.max(0, document.documentElement.scrollHeight - innerHeight));
+        return { expected, delta: Math.abs(scrollY - expected) };
+      });
+      expect((await position()).expected, 'The hydrated target must be distinct from the sparse top').toBeGreaterThan(100);
+      await expect.poll(async () => (await position()).delta).toBeLessThan(5);
+      const anchor = await page.locator(scenario.anchor).boundingBox();
+      const header = await page.locator('.site-header').boundingBox();
+      expect(anchor.y).toBeGreaterThanOrEqual(header.y + header.height);
+    }
+    expect(observed).toEqual({ errors: [], writes: [], intake: [] });
+  });
+
+}

@@ -23,7 +23,7 @@ jobs:
       - run: npm run build:booking-demo
       - run: npx playwright install --with-deps chromium webkit
         timeout-minutes: 5
-      - run: npm run test:browser
+      - run: npm run test:browser -- --max-failures=0
       - run: npm run test:booking-demo:browser
       - uses: actions/upload-artifact@v4
         if: always()
@@ -49,11 +49,36 @@ jobs:
       - name: Run existing Chromium scenarios without browser installation
         env:
           BOOKING_SYSTEM_CHROME: '1'
-        run: npx playwright test --project=chromium-desktop --project=chromium-mobile
+        run: npx playwright test --project=chromium-desktop --project=chromium-mobile --max-failures=0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: chromium-qa
           path: .qa/
+          retention-days: 7
+          include-hidden-files: true
+
+
+  public-composition:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium webkit
+        timeout-minutes: 5
+      - run: npm run test:composition
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-composition-qa
+          path: |
+            .qa/composition/
+            .qa/composition-report/
           retention-days: 7
           include-hidden-files: true

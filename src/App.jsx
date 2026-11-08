@@ -11,12 +11,14 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import Lenis from "lenis";
 import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
-import Booking from "./Booking.jsx";
+import ArrowIcon from "./ArrowIcon.jsx";
+import { restorePageScroll } from "./scroll-restoration.mjs";
 import ContactActions from "./ContactActions.jsx";
 import SocialLinks from "./SocialLinks.jsx";
 import { contactMethods } from "./contact-methods.mjs";
 import { publicSocialLinks, safePublicUrl } from "../shared/contact-links.mjs";
 import "./styles.css";
+import "./public-composition.css";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
 export function useSite() {
@@ -62,34 +64,52 @@ export function Portrait({
     />
   );
 }
-function Video({ second = false, className = "" }) {
-  const ref = useRef(null);
+function Video({ second = false, className = "", posterLayer = false }) {
+  const ref = useRef(null), frame = useRef(null);
+  const [playing, setPlaying] = useState(false);
   const { motion } = useSite();
+  const cancelFrame = () => {
+    if (frame.current != null) ref.current?.cancelVideoFrameCallback?.(frame.current);
+    frame.current = null;
+  };
+  const showFrame = () => {
+    const el = ref.current;
+    cancelFrame();
+    const decoded = () => {
+      frame.current = null;
+      if (!el.paused && el.readyState >= 2) setPlaying(true);
+    };
+    if (el.requestVideoFrameCallback) frame.current = el.requestVideoFrameCallback(decoded);
+    else decoded();
+  };
   useEffect(() => {
     const el = ref.current;
     const obs = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && motion) el.play().catch(() => {});
-        else el.pause();
+        else { cancelFrame(); setPlaying(false); el.pause(); }
       },
       { threshold: 0.05 },
     );
     obs.observe(el);
-    return () => obs.disconnect();
+    return () => { obs.disconnect(); cancelFrame(); };
   }, [motion]);
-  return (
-    <video
-      ref={ref}
-      className={className}
-      src={`/media/anna-session-neutral-0${second ? 2 : 1}.mp4`}
-      poster={`/media/session-neutral-0${second ? 2 : 1}.jpg`}
-      muted
-      loop
-      playsInline
-      preload="metadata"
-      aria-label="Видео сеанса, предоставленное Анной"
-    />
-  );
+  const poster = `/media/session-neutral-0${second ? 2 : 1}.jpg`;
+  const video = <video
+    ref={ref}
+    className={posterLayer ? "session-video" + (playing ? " is-playing" : "") : className}
+    src={`/media/anna-session-neutral-0${second ? 2 : 1}.mp4`}
+    poster={poster}
+    muted loop playsInline preload="metadata"
+    aria-label="Видео сеанса, предоставленное Анной"
+    onPlaying={showFrame}
+    onPause={() => { cancelFrame(); setPlaying(false); }}
+    onError={() => { cancelFrame(); setPlaying(false); }}
+  />;
+  return posterLayer ? <div className={"session-media " + className}>
+    <img className="session-poster" src={poster} alt="" aria-hidden="true" loading="lazy" />
+    {video}
+  </div> : video;
 }
 function Brand({ light = false }) {
   const { data } = useSite();
@@ -116,39 +136,16 @@ function Contacts({ compact = false, profile }) {
   const { data } = useSite();
   const p = profile || data.profile;
   const { phone, smsHref } = contactMethods(p);
-  if (!p.address && !phone && !p.email && !publicSocialLinks(p).length) return null;
-  return (
-    <div className={"contacts " + (compact ? "compact" : "")}>
-      <div>
-        <span>А.</span>
-        <p>
-          {p.address || "—"}
-          {safePublicUrl(p.mapUrl) && (
-            <>
-              <br />
-              <a href={safePublicUrl(p.mapUrl)} target="_blank" rel="noreferrer">
-                Как добраться
-              </a>
-            </>
-          )}
-        </p>
-      </div>
-      <div>
-        <span>К.</span>
-        <p>
-          {p.email ? <a href={"mailto:" + p.email}>{p.email}</a> : "—"}
-          <br />
-          {phone ? (
-            <a href={"tel:" + phone}>{p.phone}</a>
-          ) : (
-            "—"
-          )}
-        </p>
-      </div>
-      {smsHref && <div><span>SMS</span><a href={smsHref}>Написать SMS</a></div>}
-      {publicSocialLinks(p).length > 0 && <div><span>С.</span><SocialLinks profile={p} /></div>}
-    </div>
-  );
+  const address = p.address?.trim(), email = p.email?.trim();
+  const map = safePublicUrl(p.mapUrl);
+  if (!address && !map && !phone && !email && !publicSocialLinks(p).length) return null;
+  return <div className={"contacts " + (compact ? "compact" : "")}>
+    {(address || map) && <div><span>Приём</span><p className="pre-line">{address}{map && <a className="contact-map" href={map} target="_blank" rel="noopener noreferrer">Как добраться <ArrowIcon /></a>}</p></div>}
+    {phone && <div><span>Телефон</span><a href={"tel:" + phone}>{p.phone}</a></div>}
+    {email && <div><span>Почта</span><a href={"mailto:" + email}>{email}</a></div>}
+    {smsHref && <div><span>Сообщение</span><a href={smsHref}>Написать SMS</a></div>}
+    {publicSocialLinks(p).length > 0 && <div><span>Соцсети</span><SocialLinks profile={p} /></div>}
+  </div>;
 }
 function Header({ isHome }) {
   const { data, path, menu, setMenu } = useSite();
@@ -217,7 +214,7 @@ function Header({ isHome }) {
         >
           Меню
         </button>
-        <Link className="small-link book-link" to="/contact">
+        <Link className="small-link book-link" to="/contact" aria-label="Запись на приём">
           Запись<span> на приём</span>
         </Link>
       </header>
@@ -258,45 +255,38 @@ function Header({ isHome }) {
   );
 }
 function Footer() {
-  const { data, motion, setMotion } = useSite();
-  return (
-    <footer className="footer">
-      <p className="footer-tagline">{data.profile.name}<br /><span>{data.profile.role}</span></p>
-      <div className="footer-grid">
-        <Contacts />
-        {!data.profile.address && !contactMethods(data.profile).phone && !data.profile.email && !publicSocialLinks(data.profile).length && <p className="footer-contact-note">Контакты для записи пока не опубликованы.</p>}
-        <div className="hours">
-          <span className="eyebrow">Часы приёма</span>
-          {data.profile.hours ? (
-            <p className="pre-line">{data.profile.hours}</p>
-          ) : null}
+  const { data, path, motion, setMotion } = useSite();
+  const isContact = /^\/contact\/?$/.test(path);
+  const p = data.profile;
+  return <footer className={"footer" + (isContact ? " footer-contact-page" : "")}>
+    <div className="footer-surface">
+      <div className="footer-top">
+        <div className="footer-identity"><Brand />{p.role && <p>{p.role}</p>}</div>
+        <nav className="footer-navigation" aria-label="Разделы внизу страницы">
+          <Link to="/about">Об Анне</Link>
+          <Link to="/services">Услуги и цены</Link>
+          <Link to="/diplomas">Образование и дипломы</Link>
+        </nav>
+      </div>
+      {!isContact && <div className="footer-grid">
+        <div className="footer-details">
+          <Contacts />
+          {!p.address?.trim() && !safePublicUrl(p.mapUrl) && !contactMethods(p).phone && !p.email?.trim() && !safePublicUrl(p.bookingUrl) && !publicSocialLinks(p).length && <p className="footer-contact-note">Контакты для записи пока не опубликованы.</p>}
+          {p.hours?.trim() && <div className="hours"><span className="eyebrow">Часы приёма</span><p className="pre-line">{p.hours}</p></div>}
         </div>
-      </div>
+        <div className="footer-invitation">
+          <h2>Связаться с Анной</h2>
+          <p>Запись и организационные вопросы.</p>
+          <Link to="/contact" className="footer-contact-link">Перейти к контактам <ArrowIcon /></Link>
+        </div>
+      </div>}
       <div className="footer-bottom">
-        <span>
-          © {new Date().getFullYear()} {data.profile.name}
-        </span>
-        <Link to="/diplomas">Дипломы</Link>
-        <Link to="/privacy">Конфиденциальность</Link>
-        <Link to="/terms">Условия использования</Link>
-        <button onClick={() => setMotion(!motion)}>
-          Анимация: {motion ? "вкл." : "выкл."}
-        </button>
-        <Link to="/admin">Вход</Link>
+        <span>© {new Date().getFullYear()} {p.name}</span>
+        <div className="footer-legal"><Link to="/privacy">Конфиденциальность</Link><Link to="/terms">Условия использования</Link></div>
+        <div className="footer-settings"><button onClick={() => setMotion(!motion)}>Анимация: {motion ? "вкл." : "выкл."}</button><Link to="/admin">Вход</Link></div>
       </div>
-      <Link to="/contact" className="small-link footer-contact-link">Связаться с Анной</Link>
-      <Link to="/contact" className="footer-marquee">
-        <span>
-          Записаться на приём&nbsp;&nbsp;&nbsp; Записаться на
-          приём&nbsp;&nbsp;&nbsp;{" "}
-        </span>
-        <span aria-hidden="true">
-          Записаться на приём&nbsp;&nbsp;&nbsp; Записаться на
-          приём&nbsp;&nbsp;&nbsp;{" "}
-        </span>
-      </Link>
-    </footer>
-  );
+    </div>
+  </footer>;
 }
 function HeroPortrait() {
   const { data, motion, setMotion } = useSite();
@@ -331,11 +321,12 @@ function Hero() {
   return (
     <section className="home-hero">
       <div className="hero-first">
-        <HeroPortrait />
-        <div className="hero-shade" />
+        <div className="hero-portrait-frame"><HeroPortrait /></div>
         <div className="hero-title">
           <span className="eyebrow">{data.profile.role}</span>
           <h1><span>{names[0]}</span><span>{names.slice(1).join(" ")}</span></h1>
+        </div>
+        <div className="hero-details">
           {data.profile.address && <p className="hero-location pre-line">{data.profile.address}</p>}
           <div className="hero-actions">
             <Link to="/contact" className="hero-contact">Связаться с Анной</Link>
@@ -344,7 +335,7 @@ function Hero() {
         </div>
         <div className="hero-bottom">
           <Link to="/diplomas" className="hero-document-link">Образование и дипломы</Link>
-          <a href="#introduction" className="hero-scroll">Познакомиться <span aria-hidden="true">↓</span></a>
+          <Link to="/#introduction" className="hero-scroll">Познакомиться <span aria-hidden="true">↓</span></Link>
         </div>
       </div>
       <nav className="hero-chapters" aria-label="Навигация первого экрана">
@@ -358,6 +349,11 @@ function Hero() {
 }
 function Intro() {
   const { data } = useSite();
+  if (!data.profile.intro?.trim() && !data.profile.about?.trim()) return <section className="intro-summary" id="introduction">
+    <h2>Об Анне</h2>
+    {data.profile.qualification?.trim() && <p className="pre-line">{data.profile.qualification}</p>}
+    <Link to="/about" className="text-action">Информация о специалисте <ArrowIcon /></Link>
+  </section>;
   return (
     <section className="intro grid" id="introduction">
       <Portrait className="intro-thumb" loading="lazy" />
@@ -374,7 +370,7 @@ function Intro() {
         <p>
           {data.profile.about
             ? data.profile.about.split("\n")[0]
-            : "Анна Мысливцева — остеопат. Здесь собраны сведения о специалисте, образовании, услугах и стоимости приёма."}
+            : "Для вопросов о приёме выберите удобный способ связи с Анной."}
         </p>
         <Link to="/contact" className="small-link">
           Записаться на приём
@@ -436,21 +432,17 @@ function Editorial({ kind = "philosophy" }) {
 }
 function Feature() {
   const { data } = useSite();
-  return (
-    <section className="feature grid">
-      <h2 className="reveal">За каждым<br />приёмом —<br />человек.</h2>
-      <div className="feature-small">
-        <Video second />
-        <p>{data.profile.approach || "Познакомьтесь с Анной: биография и сведения об образовании собраны на отдельной странице."}</p>
-        <Link to="/about" className="small-link">
-          Подробнее
-        </Link>
-      </div>
-      <div className="feature-big">
-        <Video />
-      </div>
-    </section>
-  );
+  const hasApproach = Boolean(data.profile.approach?.trim());
+  return <section className={"feature grid" + (hasApproach ? "" : " feature-no-copy")}>
+    <div className="feature-copy">
+      {hasApproach && <span className="eyebrow">В процессе работы</span>}
+      <h2 className="reveal">{hasApproach ? <>За каждым<br />приёмом —<br />человек.</> : "В процессе работы."}</h2>
+      {hasApproach && <p>{data.profile.approach}</p>}
+      <Link to="/about" className="text-action">Об Анне <ArrowIcon /></Link>
+    </div>
+    <div className="feature-small"><Video second posterLayer /></div>
+    <div className="feature-big"><Video posterLayer /></div>
+  </section>;
 }
 function PageLinks() {
   const { data } = useSite();
@@ -476,16 +468,12 @@ function Home() {
   return (
     <>
       <Hero />
-      <Intro />
-      <div className="hero-second">
-        <Video />
-        <div className="film-caption"><span className="eyebrow">{data.profile.name}</span><p>В процессе<br />работы.</p><span className="eyebrow">{data.profile.role}</span></div>
-      </div>
-      <EducationFeature />
-      <Editorial />
+      {!data.profile.intro?.trim() && !data.profile.about?.trim() && !data.diplomas.length ? <div className="home-overview">
+        <Intro />
+        <EducationFeature />
+      </div> : <><Intro /><EducationFeature /></>}
+      {data.profile.philosophy && <Editorial />}
       <Feature />
-      <FullMedia single />
-      <Editorial kind="approach" />
       {(data.news.length > 0 || data.offers.length > 0) && (
         <div className="home-updates">
           <h2 className="eyebrow">Новости и акции</h2>
@@ -505,29 +493,31 @@ function Home() {
           </div>
         </div>
       )}
-      {!data.news.length && !data.offers.length && <JournalLinks />}
-      <section className="home-next editorial grid" aria-labelledby="home-next-title">
-        <h2 id="home-next-title">Связаться с Анной</h2>
-        <div>
-          <p>Чтобы обсудить запись или задать организационный вопрос, выберите удобный способ связи.</p>
-          <Link to="/contact" className="text-action">Перейти к контактам <span aria-hidden="true">↗</span></Link>
-        </div>
-      </section>
     </>
   );
 }
 function EducationFeature() {
   const { data } = useSite();
+  if (!data.diplomas.length) return <section className="education-summary">
+    <h2>Образование и дипломы</h2>
+    <p>Документы об образовании пока не опубликованы.</p>
+    <Link to="/diplomas" className="text-action">Открыть раздел <ArrowIcon /></Link>
+  </section>;
   return <section className="education-feature grid">
     <div className="education-heading"><span className="eyebrow">Образование и квалификация</span><h2 className="reveal">Образование<br />и дипломы.</h2></div>
-    <div className="education-description"><p>Дипломы и сертификаты Анны — в отдельном разделе. Каждый опубликованный документ можно рассмотреть в полном размере.</p><Link to="/diplomas" className="text-action">Посмотреть дипломы <span aria-hidden="true">↗</span></Link></div>
-    <div className="education-foot"><span>{data.profile.name}</span><span>{data.diplomas.length ? `${data.diplomas.length} документов` : "Образование · Дипломы · Сертификаты"}</span></div>
+    <div className="education-description"><p>Дипломы и сертификаты Анны — в отдельном разделе. Каждый опубликованный документ можно рассмотреть в полном размере.</p><Link to="/diplomas" className="text-action">Посмотреть дипломы <ArrowIcon /></Link></div>
+    <div className="education-foot"><span>{data.profile.name}</span><span>{`${data.diplomas.length} документов`}</span></div>
   </section>;
 }
 function JournalLinks() {
+  const { data } = useSite();
+  if (!data.news.length && !data.offers.length) return null;
   return <section className="journal-links grid">
     <h2 className="eyebrow">Актуальное</h2>
-    <div><Link to="/news"><span>01</span><h3>Новости</h3><span aria-hidden="true">↗</span></Link><Link to="/offers"><span>02</span><h3>Акции</h3><span aria-hidden="true">↗</span></Link></div>
+    <div>
+      {data.news.length > 0 && <Link to="/news"><span>01</span><h3>Новости</h3><ArrowIcon /></Link>}
+      {data.offers.length > 0 && <Link to="/offers"><span>02</span><h3>Акции</h3><ArrowIcon /></Link>}
+    </div>
   </section>;
 }
 function PageHero({ first, last, video = false, children }) {
@@ -590,14 +580,20 @@ function Services() {
     }
     setActive(i);
   };
+  if (!data.services.length) return <section className="quiet-page-heading">
+    <span className="eyebrow">Услуги Анны</span>
+    <h1>Услуги и стоимость.</h1>
+    <Empty>Перечень услуг и цены скоро появятся.</Empty>
+    <Link to="/about" className="text-action">Познакомиться с Анной <ArrowIcon /></Link>
+  </section>;
   return (
     <>
       <PageHero first="Услуги" last="и стоимость." video />
       <section ref={section} className="service-section grid" id="services">
         <nav className="section-index">
-          <a href="#services" className="small-link">
+          <Link to="/services#services" className="small-link">
             Услуги и цены
-          </a>
+          </Link>
           <Link to="/contact" className="small-link">
             Запись на приём
           </Link>
@@ -659,33 +655,25 @@ function Services() {
 function About() {
   const { data } = useSite();
   const p = data.profile;
-  return (
-    <>
-      <PageHero first="Анна" last="Мысливцева.">
-        {p.role}
-      </PageHero>
-      <section className="about-intro editorial grid">
-        <h2 className="eyebrow">Об Анне</h2>
-        <div>
-          <h3 className="reveal">{p.intro || p.name + " · " + p.role}</h3>
-          <p className="pre-line biography">{p.about || "Биография Анны пока не опубликована."}</p>
-        </div>
-      </section>
-      <section className="about-portrait grid">
-        <Portrait loading="lazy" />
-        <div>
-          <span className="eyebrow">{p.role}</span>
-          <h2>{p.name}</h2>
-          {p.qualification && <p className="pre-line">{p.qualification}</p>}
-          <Link to="/diplomas" className="small-link">
-            Образование и дипломы
-          </Link>
-        </div>
-      </section>
-      <DiplomaGallery short />
-      <PageLinks />
-    </>
-  );
+  return <>
+    <section className="about-profile">
+      <header className="about-profile-heading">
+        <span className="eyebrow">Об Анне</span>
+        <h1>{p.name}</h1>
+        {p.role && <p>{p.role}</p>}
+      </header>
+      <div className="about-profile-portrait"><Portrait loading="eager" /></div>
+      <div className="about-profile-copy">
+        {p.intro?.trim() && <p className="about-lead pre-line">{p.intro}</p>}
+        <p className="pre-line">{p.about?.trim() ? p.about : "Биография Анны пока не опубликована."}</p>
+        {p.qualification?.trim() && <div className="about-qualification"><h2>Образование</h2><p className="pre-line">{p.qualification}</p></div>}
+      </div>
+    </section>
+    {data.diplomas.length ? <DiplomaGallery short /> : <section className="about-education">
+      <div><h2>Образование и дипломы</h2><p>Документы об образовании пока не опубликованы.</p></div>
+      <Link to="/diplomas" className="text-action">Открыть раздел <ArrowIcon /></Link>
+    </section>}
+  </>;
 }
 function DiplomaGallery({ short = false }) {
   const { data } = useSite();
@@ -774,6 +762,11 @@ function Listing({ type, id }) {
   const list = data[type];
   const item = id ? list.find((x) => x.id === id) : null;
   if (id && !item) return <NotFound />;
+  if (!id && !list.length) return <section className="quiet-page-heading">
+    <span className="eyebrow">Публикации Анны</span><h1>{title}</h1>
+    <Empty>{type === "news" ? "Новостей пока нет." : "Актуальных акций пока нет."}</Empty>
+    <Link to="/" className="text-action">На главную <ArrowIcon /></Link>
+  </section>;
   return item ? (
     <>
       <section className="article-page">
@@ -855,39 +848,7 @@ function formatDate(s) {
 function Contact() {
   const { data } = useSite();
   const p = Object.fromEntries(Object.entries(data.profile).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
-  return (
-    <>
-      <ContactActions profile={p} />
-      <Booking profile={p} />
-      <section className="contact-section grid">
-        <h2>
-          Связаться
-          <br />с Анной.
-        </h2>
-        <div>
-          <Contacts profile={p} />
-          {p.hours && (
-            <>
-              <h3>Часы приёма</h3>
-              <p className="pre-line">{p.hours}</p>
-            </>
-          )}
-          {safePublicUrl(p.bookingUrl) ? (
-            <a
-              className="solid-link"
-              href={safePublicUrl(p.bookingUrl)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Записаться на приём
-            </a>
-          ) : !contactMethods(p).phone && !p.email && !publicSocialLinks(p).length ? (
-            <Empty>Контакты для записи скоро появятся.</Empty>
-          ) : null}
-        </div>
-      </section>
-    </>
-  );
+  return <ContactActions profile={p} />;
 }
 function Legal({ type }) {
   const { data } = useSite();
@@ -917,12 +878,19 @@ function NotFound() {
 }
 function Diplomas() {
   const { data } = useSite();
+  if (!data.diplomas.length) return <section className="quiet-page-heading documents-summary" id="documents">
+    <span className="eyebrow">Образование</span>
+    <h1>Образование и дипломы</h1>
+    {data.profile.qualification?.trim() && <p className="pre-line">{data.profile.qualification}</p>}
+    <Empty>Документы об образовании пока не опубликованы.</Empty>
+    <Link to="/about" className="text-action">Об Анне <ArrowIcon /></Link>
+  </section>;
   return <>
     <section className="documents-hero grid">
       <span className="eyebrow">Анна Мысливцева / Образование</span>
       <h1>Образование<br /><span>и дипломы.</span></h1>
       <Portrait loading="eager" />
-      <div><p>{data.profile.qualification || "Дипломы, сертификаты и сведения об образовании специалиста."}</p><a href="#documents" className="text-action">К документам <span aria-hidden="true">↓</span></a></div>
+      <div><p>{data.profile.qualification || "Дипломы, сертификаты и сведения об образовании специалиста."}</p><Link to="/diplomas#documents" className="text-action">К документам <span aria-hidden="true">↓</span></Link></div>
     </section>
     <div id="documents"><DiplomaGallery /></div>
     <JournalLinks />
@@ -967,9 +935,21 @@ export default function App() {
         setError("Не удалось обновить информацию. Попробуйте позже."),
       )
       .finally(() => setReady(true));
+  const [entryTransition, setEntryTransition] = useState(0);
+  const pendingScroll = useRef(window.location.hash ? { hash: window.location.hash } : null);
+  const scrollPositions = useRef(new Map());
+  const historyKey = useRef(history.state?.annaEntryKey || crypto.randomUUID());
   useEffect(() => {
     load();
-    const pop = () => {
+    const previousRestoration = history.scrollRestoration;
+    history.scrollRestoration = "manual";
+    history.replaceState({ ...history.state, annaEntryKey: historyKey.current }, "");
+    const pop = (event) => {
+      scrollPositions.current.set(historyKey.current, window.scrollY);
+      historyKey.current = event.state?.annaEntryKey || crypto.randomUUID();
+      history.replaceState({ ...event.state, annaEntryKey: historyKey.current }, "");
+      pendingScroll.current = scrollPositions.current.get(historyKey.current) ?? event.state?.annaScrollY ?? (window.location.hash ? { hash: window.location.hash } : 0);
+      setEntryTransition(value => value + 1);
       setPath(window.location.pathname);
       setMenu(false);
     };
@@ -978,18 +958,42 @@ export default function App() {
     window.addEventListener("focus", focus);
     return () => {
       window.removeEventListener("popstate", pop);
+      history.scrollRestoration = previousRestoration;
       window.removeEventListener("focus", focus);
     };
   }, []);
+  useLayoutEffect(() => {
+    if (pendingScroll.current === null) return;
+    const target = pendingScroll.current;
+    const anchor = typeof target === "object" ? document.getElementById(target.hash.slice(1)) : null;
+    // CMS hydration can mount or move an existing anchor. The stable skip target is immediate.
+    if (typeof target === "object" && target.hash !== "#main" && !ready) return;
+    return restorePageScroll({
+      root: root.current,
+      top: () => typeof target === "number" ? target : anchor ? Math.max(0, anchor.getBoundingClientRect().top + window.scrollY - parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop || "0")) : 0,
+      getLenis: () => lenis.current,
+      focusTarget: anchor?.id === "main" ? anchor : null,
+      onFinish: () => {
+        if (pendingScroll.current === target) pendingScroll.current = null;
+      },
+    });
+  }, [path, entryTransition, ready]);
   const navigate = (to) => {
-    if (to === path) {
+    const url = new URL(to, window.location.href);
+    if (url.pathname + url.hash === window.location.pathname + window.location.hash) {
       setMenu(false);
+      pendingScroll.current = url.hash ? { hash: url.hash } : 0;
+      setEntryTransition(value => value + 1);
       return;
     }
-    history.pushState({}, "", to);
+    scrollPositions.current.set(historyKey.current, window.scrollY);
+    history.replaceState({ ...history.state, annaScrollY: window.scrollY }, "");
+    pendingScroll.current = url.hash ? { hash: url.hash } : 0;
+    historyKey.current = crypto.randomUUID();
+    history.pushState({ annaEntryKey: historyKey.current, annaScrollY: 0 }, "", to);
     setMenu(false);
-    setPath(to);
-    window.scrollTo(0, 0);
+    setPath(url.pathname);
+    setEntryTransition(value => value + 1);
     load();
   };
   useEffect(() => {
@@ -1062,7 +1066,7 @@ export default function App() {
       gsap.utils.toArray(".feature-big").forEach((el) =>
         gsap.fromTo(
           el,
-          { scaleX: 0.8, transformOrigin: "left center" },
+          { scaleX: 0.96, transformOrigin: "left center" },
           {
             scaleX: 1,
             ease: "none",
@@ -1123,16 +1127,16 @@ export default function App() {
           <Admin />
         ) : (
           <>
-            <a href="#main" className="skip-link">
+            <Link to={path + "#main"} className="skip-link">
               К содержимому
-            </a>
+            </Link>
             <Header isHome={path === "/"} />
             {error && (
               <div className="load-error" role="status">
                 {error}
               </div>
             )}
-            <main id="main" key={path} className="page-enter">
+            <main id="main" key={path} className="page-enter" tabIndex={-1}>
               <Page />
             </main>
             <Footer />

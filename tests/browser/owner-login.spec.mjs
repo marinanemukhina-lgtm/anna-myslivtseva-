@@ -304,7 +304,7 @@ test('temporary schedule edits hours without private calls, then owner login and
   await page.getByLabel('Запись вперёд, дней',{exact:true}).fill('43');
   await page.getByLabel('Часовой пояс',{exact:true}).fill('Europe/Moscow');
   await page.getByLabel('Длительность: Тестовая услуга',{exact:true}).fill('45');
-  await page.getByRole('button',{name:'Добавить интервал : Понедельник',exact:true}).click();
+  await page.getByRole('button',{name:'Добавить интервал: Понедельник',exact:true}).click();
   await page.getByLabel('Понедельник: начало 1',{exact:true}).fill('09:00');
   await page.getByLabel('Понедельник: конец 1',{exact:true}).fill('12:00');
   await page.getByLabel('Выбранная дата',{exact:true}).fill('2026-11-09');

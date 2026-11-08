@@ -1,0 +1,106 @@
+name: Hallmark site design audit
+on:
+  push:
+    branches:
+      - audit/hallmark-anna-20261101
+    paths:
+      - .github/workflows/hallmark-audit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Anna public site
+        uses: actions/checkout@v4
+      - name: Checkout pinned Hallmark 2.0.0 upstream
+        uses: actions/checkout@v4
+        with:
+          repository: Nutlope/hallmark
+          ref: 4f6a46c6dc325d40ab268c93e25c7b96676ebccd
+          path: .hallmark-upstream
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install Anna dependencies
+        run: npm ci
+      - name: Build current public site
+        run: npm run build
+      - name: Install browser audit dependencies (temporary, not committed)
+        run: |
+          npm install --no-save --no-package-lock --ignore-scripts puppeteer-core@24.26.1
+          npx playwright install --with-deps chromium
+      - name: Audit 5 routes at 7 viewport widths with synthetic content
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .qa/hallmark
+          node scripts/qa-server.mjs > .qa/hallmark/server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4176/api/content -o /dev/null; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:4176/api/content -o /dev/null
+          if command -v google-chrome >/dev/null; then
+            export CHROME_PATH="$(command -v google-chrome)"
+          elif command -v chromium >/dev/null; then
+            export CHROME_PATH="$(command -v chromium)"
+          else
+            export CHROME_PATH="$(find "$HOME/.cache/ms-playwright" -type f -name chrome -print -quit)"
+          fi
+          echo "Using Chrome at $CHROME_PATH"
+          test -n "$CHROME_PATH"
+          node .hallmark-upstream/skills/hallmark/scripts/sloplint.mjs src index.html \
+            --genre editorial --before --json \
+            --url http://127.0.0.1:4176/ \
+            --url http://127.0.0.1:4176/about \
+            --url http://127.0.0.1:4176/services \
+            --url http://127.0.0.1:4176/news \
+            --url http://127.0.0.1:4176/contact > .qa/hallmark/results.json
+          node --input-type=module -e '
+          import fs from "node:fs";
+          const f = JSON.parse(fs.readFileSync(".qa/hallmark/results.json", "utf8"));
+          const summary = f.summary || {};
+          const items = (f.findings || []).slice(0, 80);
+          const lines = [
+            "# Hallmark audit: Anna Myslivtseva public site",
+            "",
+            "Upstream: Nutlope/hallmark v2.0.0 commit 4f6a46c6dc325d40ab268c93e25c7b96676ebccd (MIT)",
+            "Target: main at " + process.env.GITHUB_SHA + ", local fixture, no real patients",
+            "Routes: /, /about, /services, /news, /contact",
+            "Scope: report only; visual redesign not authorized",
+            "",
+            "## Mechanical results",
+            "FAIL: " + summary.fails + ", REFLEX: " + summary.reflex +
+            ", WARN: " + summary.warns + ", render: " + summary.render,
+            "",
+            "## Sample of findings (first 80; see JSON for full list)",
+            ...items.map(x => "- " + x.grade + " " + x.gate + " at " + x.file + ":" + x.line + " — " + x.evidence),
+            "",
+            "The rules are Hallmark design preferences, not independently validated defects; audit recommendations must preserve the established Odyssée-inspired direction and patient safety."
+          ];
+          fs.writeFileSync(".qa/hallmark/report.md", lines.join("\n") + "\n");
+          console.log("Hallmark:", JSON.stringify(summary));
+          console.log("Findings:", (f.findings || []).length);
+          if (summary.render !== "ran") {
+            console.error("Browser-render tier did not run.");
+            process.exitCode = 1;
+          }
+          '
+      - name: Upload reproducible report and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hallmark-anna-public-audit
+          path: |
+            .qa/hallmark/
+            .hallmark/before/
+            .hallmark/before.json
+            .hallmark/before.txt
+          retention-days: 7

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { initialContent } from '../../shared/content.mjs';
+import { capture, renderedBounds } from './capture.mjs';
 
 const address = 'Ростов-на-Дону. Выезд на дом по предварительной записи.';
 const phone = '+7 (900) 000-00-01';
@@ -53,7 +54,7 @@ async function topIsVisible(page) {
   expect(heading.y).toBeGreaterThanOrEqual(header.y + header.height + 12);
 }
 async function noOverflow(page) {
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await renderedBounds(page);
   for (const selector of ['.site-header .brand', '.site-header .book-link', '.site-header .menu-trigger', '.contact-actions', '.footer-surface']) {
     const element = page.locator(selector);
     if (!(await element.count())) continue;
@@ -70,18 +71,6 @@ async function noOverflow(page) {
   const items = await page.locator('.site-header > *').evaluateAll(elements => elements.map(el => el.getBoundingClientRect()).filter(r => r.width && r.height).sort((a,b) => a.x-b.x).map(r => ({ x:r.x, right:r.right })));
   for (let i=1; i<items.length; i++) expect(items[i].x).toBeGreaterThanOrEqual(items[i-1].right + 4);
 }
-async function capture(page, info, name) {
-  for (const media of await page.locator('main img, main video:not([aria-hidden="true"])').all()) {
-    if (!(await media.isVisible())) continue;
-    await media.scrollIntoViewIfNeeded();
-    await expect.poll(() => media.evaluate(el => el.tagName === 'IMG' ? el.complete && el.naturalWidth > 0 : el.readyState >= 1 && !el.error)).toBe(true);
-  }
-  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
-  await page.screenshot({ path: info.outputPath(`${name}-full.png`), fullPage: true });
-  await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
-  await page.screenshot({ path: info.outputPath(`${name}-bottom.png`) });
-}
-
 for (const reducedMotion of ['reduce', 'no-preference']) {
   for (const filled of [false, true]) {
     test(`contact ${filled ? 'synthetic-filled' : 'production-shaped-synthetic-phone'} / motion ${reducedMotion}`, async ({ page }, info) => {
@@ -154,6 +143,10 @@ for (const reducedMotion of ['reduce', 'no-preference']) {
     expect(frame.y + frame.height).toBeLessThanOrEqual(page.viewportSize().height);
     await expect(page.locator('.hero-portrait-frame img')).toHaveCSS('object-fit', 'contain');
     await expect(page.locator('.portrait-motion-toggle')).toBeVisible();
+    const control = await page.locator('.portrait-motion-toggle').boundingBox();
+    expect(control.y).toBeGreaterThan(frame.y + frame.height / 2);
+    expect(control.y + control.height).toBeLessThanOrEqual(frame.y + frame.height);
+
     if (reducedMotion === 'reduce') expect(await page.locator('.hero-portrait-video').evaluate(video => video.paused)).toBe(true);
     else await expect(page.locator('.hero-portrait-video')).toHaveClass(/is-playing/);
     for (const selector of ['.hero-contact', '.hero-document-link']) {
@@ -190,7 +183,8 @@ for (const reducedMotion of ['reduce', 'no-preference']) {
     }), label));
     await measureRestoration('before-contact');
     const before = restoration[0].actualY;
-    expect(before).toBeGreaterThan(page.viewportSize().height);
+    expect(before).toBeGreaterThan(0);
+    expect(Math.abs(before - (restoration[0].scrollHeight - restoration[0].innerHeight))).toBeLessThanOrEqual(5);
     await page.locator('.site-header .book-link').click();
     await expect(page).toHaveURL(/\/contact$/);
     await topIsVisible(page);
@@ -245,40 +239,68 @@ for (const reducedMotion of ['reduce', 'no-preference']) {
         await expect(page.locator('main video, .service-section')).toHaveCount(0);
         expect((await page.locator('main').boundingBox()).height).toBeLessThan(page.viewportSize().height);
       }
+      if (path === '/about') {
+        await expect(page.locator('main img')).toHaveCount(1);
+        await expect(page.locator('main a[href="/about"], .about-portrait, .page-links')).toHaveCount(0);
+        await expect(page.locator('main')).toContainText('Биография Анны пока не опубликована.');
+      }
       if (path === '/diplomas') {
-        await page.locator('a[href="/diplomas#documents"]').click();
-        await expect(page).toHaveURL(/\/diplomas#documents$/);
-        const y = await page.evaluate(() => window.scrollY);
-        await page.goBack();
-        await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
-        await page.goForward();
-        await expect.poll(() => page.evaluate(target => Math.abs(window.scrollY - target), y)).toBeLessThan(5);
+        await expect(page.locator('.documents-hero, main a[href="/diplomas#documents"]')).toHaveCount(0);
+        await expect(page.locator('main')).toContainText('Документы об образовании пока не опубликованы.');
       }
       await capture(page, info, `${path.slice(1)}-production-shaped-synthetic-phone-${reducedMotion}`);
       await page.locator('footer .footer-contact-link').click();
       await topIsVisible(page);
     }
-    // A cold hash target may not exist until CMS hydration completes.
+    // Published documents keep the original gallery and same-path hash history regression.
+    const documented = structuredClone(initialContent);
+    Object.assign(documented.profile, { phone, address, socialLinks: {} });
+    documented.diplomas = [{ id: 'synthetic-document', title: 'Синтетический документ для проверки перехода', body: 'Синтетический текст для проверки позиции опубликованного документа. '.repeat(20), image: '', issuer: '', year: '', fileType: 'image', published: true }];
+    await page.route('**/api/content', route => route.fulfill({ json: documented }));
+    await ready(page, '/diplomas');
+    await expect(page.locator('.diploma-grid')).toContainText('Синтетический документ');
+    await page.locator('a[href="/diplomas#documents"]').click();
+    await expect(page).toHaveURL(/\/diplomas#documents$/);
+    const y = await page.evaluate(() => window.scrollY);
+    await page.goBack();
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
+    await page.goForward();
+    await expect.poll(() => page.evaluate(target => Math.abs(window.scrollY - target), y)).toBeLessThan(5);
+    await noOverflow(page);
+    // Hydration can either mount an anchor or move an existing sparse-state anchor.
     const delayed = structuredClone(initialContent);
     Object.assign(delayed.profile, { phone, address, socialLinks: {} });
     delayed.services = [{ id: 'synthetic-service', title: 'Тестовая услуга', body: 'Синтетическое описание для проверки навигации.', image: '', price: '', duration: '', category: '', published: true }];
-    let release;
-    const gate = new Promise(resolve => { release = resolve; });
-    await page.route('**/api/content', async route => {
-      await gate;
-      await route.fulfill({ json: delayed });
-    });
-    await page.goto('/services#services');
-    await expect(page.locator('#services')).toHaveCount(0);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
-    release();
-    await expect(page.locator('#services')).toBeVisible();
-    await page.evaluate(() => document.fonts.ready);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
-    await expect.poll(() => page.locator('#services').evaluate(element => Math.abs(element.getBoundingClientRect().top - parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop)))).toBeLessThan(5);
-    const anchor = await page.locator('#services').boundingBox();
-    const header = await page.locator('.site-header').boundingBox();
-    expect(anchor.y).toBeGreaterThanOrEqual(header.y + header.height);
+    for (const scenario of [
+      {path: '/services#services', anchor: '#services', data: delayed},
+      {path: '/diplomas#documents', anchor: '#documents', data: documented},
+    ]) {
+      let release;
+      const gate = new Promise(resolve => { release = resolve; });
+      await page.route('**/api/content', async route => {
+        await gate;
+        await route.fulfill({ json: scenario.data });
+      });
+      await page.goto(scenario.path);
+      if (scenario.anchor === '#services') await expect(page.locator(scenario.anchor)).toHaveCount(0);
+      else await expect(page.locator('.documents-summary')).toHaveCount(1);
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(2);
+      release();
+      if (scenario.anchor === '#documents') await expect(page.locator('.diploma-grid')).toBeVisible();
+      await expect(page.locator(scenario.anchor)).toBeVisible();
+      await page.evaluate(() => document.fonts.ready);
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100);
+      const position = () => page.locator(scenario.anchor).evaluate(element => {
+        const requested = Math.max(0, element.getBoundingClientRect().top + scrollY - parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop));
+        const expected = Math.min(requested, Math.max(0, document.documentElement.scrollHeight - innerHeight));
+        return { expected, delta: Math.abs(scrollY - expected) };
+      });
+      expect((await position()).expected, 'The hydrated target must be distinct from the sparse top').toBeGreaterThan(100);
+      await expect.poll(async () => (await position()).delta).toBeLessThan(5);
+      const anchor = await page.locator(scenario.anchor).boundingBox();
+      const header = await page.locator('.site-header').boundingBox();
+      expect(anchor.y).toBeGreaterThanOrEqual(header.y + header.height);
+    }
     expect(observed).toEqual({ errors: [], writes: [], intake: [] });
   });
 

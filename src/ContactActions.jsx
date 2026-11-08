@@ -18,10 +18,10 @@ export default function ContactActions({ profile = {} }) {
       {hasActions && <div className="contact-actions">
         {phone && <a className="contact-button contact-primary" href={"tel:" + phone}><span>Позвонить Анне</span><span>{displayPhone}</span></a>}
         {smsHref && <a className="contact-button" href={smsHref}>Написать SMS<ArrowIcon /></a>}
+      {smsHref && <p className="contact-note">SMS откроется в приложении сообщений, если оно доступно на вашем устройстве. Сообщение отправляете вы.</p>}
         {email && <a className="contact-button contact-email" href={"mailto:" + email}><span>Электронная почта<span>{email}</span></span><ArrowIcon /></a>}
         {booking && <a className="contact-button" href={booking} target="_blank" rel="noopener noreferrer">Записаться на приём<ArrowIcon /></a>}
       </div>}
-      {smsHref && <p className="contact-note">SMS откроется в приложении сообщений, если оно доступно на вашем устройстве. Сообщение отправляете вы.</p>}
       <SocialLinks profile={profile} prominent />
     </div>
     <figure className="contact-portrait"><img src={!profile.portrait || profile.portrait === "/media/anna-portrait.jpg" ? "/media/anna-portrait-smile.png" : profile.portrait} alt={profile.name || "Анна Мысливцева"} style={{ objectPosition: `50% ${profile.heroPosition ?? 0}%` }} loading="eager" /></figure>

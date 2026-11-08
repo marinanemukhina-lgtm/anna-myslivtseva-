@@ -10,7 +10,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 fs.mkdirSync('.qa', { recursive: true });
 await build({
   stdin: {
-    contents: fs.readFileSync('src/App.jsx', 'utf8') + '\nexport {Contact, Footer, Site};',
+    contents: fs.readFileSync('src/App.jsx', 'utf8') + '\nexport {Contact, Footer, About, Diplomas, Video, Site};',
     resolveDir: path.resolve('src'),
     loader: 'jsx',
   },
@@ -31,7 +31,7 @@ await build({
   loader: { '.css': 'empty' },
   outfile: '.qa/contact-render.mjs',
 });
-const { Contact, Footer, Site } = await import('../.qa/contact-render.mjs');
+const { Contact, Footer, About, Diplomas, Video, Site } = await import('../.qa/contact-render.mjs');
 const renderContact = profile => renderToStaticMarkup(React.createElement(Site.Provider, {
   value: { data: { profile }, navigate: () => {}, motion: false },
 }, React.createElement(Contact)));
@@ -93,4 +93,46 @@ test('empty footer does not render placeholder contact rows or hours', () => {
   const bookingOnly = renderFooter({name: 'Анна', bookingUrl: 'https://example.invalid/book'});
   assert.doesNotMatch(bookingOnly, /Контакты для записи пока не опубликованы/);
   assert.match(bookingOnly, /class="footer-contact-link"/);
+});
+
+
+const renderPublicSection = (Component, profile = {}, diplomas = [], props = {}) => renderToStaticMarkup(React.createElement(Site.Provider, {
+  value: {data: {profile: {name: 'Имя из CMS', role: 'Роль из CMS', ...profile}, diplomas, news: [], offers: []}, navigate: () => {}, motion: false},
+}, React.createElement(Component, props)));
+test('about uses one full portrait and honest unpublished content without self-links', () => {
+  const html = renderPublicSection(About);
+  assert.equal((html.match(/<img /g) || []).length, 1);
+  assert.equal((html.match(/<h1/g) || []).length, 1);
+  assert.match(html, /Биография Анны пока не опубликована/);
+  assert.match(html, /Документы об образовании пока не опубликованы/);
+  assert.match(html, /href="\/diplomas"/);
+  assert.doesNotMatch(html, /href="\/about"|page-hero|page-links|about-portrait|Все документы/);
+});
+test('about retains published introduction, biography, qualification and diploma gallery', () => {
+  const html = renderPublicSection(About, {intro: 'Вступление из CMS', about: 'Биография из CMS', qualification: 'Образование из CMS'}, [{id: 'synthetic-diploma', title: 'Синтетический документ', image: '', body: 'Синтетическое описание'}]);
+  for (const value of ['Вступление из CMS', 'Биография из CMS', 'Образование из CMS', 'Синтетический документ', 'Синтетическое описание']) assert.match(html, new RegExp(value));
+  assert.match(html, /diploma-grid/);
+  assert.doesNotMatch(html, /пока не опубликована|пока не опубликованы/);
+});
+test('empty diploma page keeps its anchor without promising unavailable documents', () => {
+  const empty = renderPublicSection(Diplomas, {qualification: 'Образование из CMS'});
+  assert.match(empty, /id="documents"/);
+  assert.match(empty, /Образование из CMS/);
+  assert.match(empty, /Документы об образовании пока не опубликованы/);
+  assert.doesNotMatch(empty, /documents-hero|К документам|<img/);
+  const published = renderPublicSection(Diplomas, {}, [{id: 'synthetic-diploma', title: 'Синтетический документ', image: '', body: ''}]);
+  assert.match(published, /documents-hero/);
+  assert.match(published, /href="\/diplomas#documents"/);
+  assert.match(published, /Синтетический документ/);
+});
+test('session media keeps the original poster layer and both unchanged video sources', () => {
+  for (const second of [false, true]) {
+    const n = second ? 2 : 1;
+    const html = renderPublicSection(Video, {}, [], {second, posterLayer: true});
+    assert.match(html, new RegExp('src="/media/session-neutral-0' + n + '.jpg"'));
+    assert.match(html, new RegExp('src="/media/anna-session-neutral-0' + n + '.mp4"'));
+    assert.match(html, /class="session-poster"/);
+    assert.match(html, /class="session-video"/);
+    assert.doesNotMatch(html, /is-playing/);
+  }
 });

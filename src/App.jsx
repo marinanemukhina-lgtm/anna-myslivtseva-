@@ -64,34 +64,52 @@ export function Portrait({
     />
   );
 }
-function Video({ second = false, className = "" }) {
-  const ref = useRef(null);
+function Video({ second = false, className = "", posterLayer = false }) {
+  const ref = useRef(null), frame = useRef(null);
+  const [playing, setPlaying] = useState(false);
   const { motion } = useSite();
+  const cancelFrame = () => {
+    if (frame.current != null) ref.current?.cancelVideoFrameCallback?.(frame.current);
+    frame.current = null;
+  };
+  const showFrame = () => {
+    const el = ref.current;
+    cancelFrame();
+    const decoded = () => {
+      frame.current = null;
+      if (!el.paused && el.readyState >= 2) setPlaying(true);
+    };
+    if (el.requestVideoFrameCallback) frame.current = el.requestVideoFrameCallback(decoded);
+    else decoded();
+  };
   useEffect(() => {
     const el = ref.current;
     const obs = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && motion) el.play().catch(() => {});
-        else el.pause();
+        else { cancelFrame(); setPlaying(false); el.pause(); }
       },
       { threshold: 0.05 },
     );
     obs.observe(el);
-    return () => obs.disconnect();
+    return () => { obs.disconnect(); cancelFrame(); };
   }, [motion]);
-  return (
-    <video
-      ref={ref}
-      className={className}
-      src={`/media/anna-session-neutral-0${second ? 2 : 1}.mp4`}
-      poster={`/media/session-neutral-0${second ? 2 : 1}.jpg`}
-      muted
-      loop
-      playsInline
-      preload="metadata"
-      aria-label="Видео сеанса, предоставленное Анной"
-    />
-  );
+  const poster = `/media/session-neutral-0${second ? 2 : 1}.jpg`;
+  const video = <video
+    ref={ref}
+    className={posterLayer ? "session-video" + (playing ? " is-playing" : "") : className}
+    src={`/media/anna-session-neutral-0${second ? 2 : 1}.mp4`}
+    poster={poster}
+    muted loop playsInline preload="metadata"
+    aria-label="Видео сеанса, предоставленное Анной"
+    onPlaying={showFrame}
+    onPause={() => { cancelFrame(); setPlaying(false); }}
+    onError={() => { cancelFrame(); setPlaying(false); }}
+  />;
+  return posterLayer ? <div className={"session-media " + className}>
+    <img className="session-poster" src={poster} alt="" aria-hidden="true" loading="lazy" />
+    {video}
+  </div> : video;
 }
 function Brand({ light = false }) {
   const { data } = useSite();
@@ -422,8 +440,8 @@ function Feature() {
       {hasApproach && <p>{data.profile.approach}</p>}
       <Link to="/about" className="text-action">Об Анне <ArrowIcon /></Link>
     </div>
-    <div className="feature-small"><Video second /></div>
-    <div className="feature-big"><Video /></div>
+    <div className="feature-small"><Video second posterLayer /></div>
+    <div className="feature-big"><Video posterLayer /></div>
   </section>;
 }
 function PageLinks() {
@@ -637,33 +655,25 @@ function Services() {
 function About() {
   const { data } = useSite();
   const p = data.profile;
-  return (
-    <>
-      <PageHero first="Анна" last="Мысливцева.">
-        {p.role}
-      </PageHero>
-      <section className="about-intro editorial grid">
-        <h2 className="eyebrow">Об Анне</h2>
-        <div>
-          <h3 className="reveal">{p.intro || p.name + " · " + p.role}</h3>
-          <p className="pre-line biography">{p.about || "Биография Анны пока не опубликована."}</p>
-        </div>
-      </section>
-      <section className="about-portrait grid">
-        <Portrait loading="lazy" />
-        <div>
-          <span className="eyebrow">{p.role}</span>
-          <h2>{p.name}</h2>
-          {p.qualification && <p className="pre-line">{p.qualification}</p>}
-          <Link to="/diplomas" className="small-link">
-            Образование и дипломы
-          </Link>
-        </div>
-      </section>
-      <DiplomaGallery short />
-      <PageLinks />
-    </>
-  );
+  return <>
+    <section className="about-profile">
+      <header className="about-profile-heading">
+        <span className="eyebrow">Об Анне</span>
+        <h1>{p.name}</h1>
+        {p.role && <p>{p.role}</p>}
+      </header>
+      <div className="about-profile-portrait"><Portrait loading="eager" /></div>
+      <div className="about-profile-copy">
+        {p.intro?.trim() && <p className="about-lead pre-line">{p.intro}</p>}
+        <p className="pre-line">{p.about?.trim() ? p.about : "Биография Анны пока не опубликована."}</p>
+        {p.qualification?.trim() && <div className="about-qualification"><h2>Образование</h2><p className="pre-line">{p.qualification}</p></div>}
+      </div>
+    </section>
+    {data.diplomas.length ? <DiplomaGallery short /> : <section className="about-education">
+      <div><h2>Образование и дипломы</h2><p>Документы об образовании пока не опубликованы.</p></div>
+      <Link to="/diplomas" className="text-action">Открыть раздел <ArrowIcon /></Link>
+    </section>}
+  </>;
 }
 function DiplomaGallery({ short = false }) {
   const { data } = useSite();
@@ -868,6 +878,13 @@ function NotFound() {
 }
 function Diplomas() {
   const { data } = useSite();
+  if (!data.diplomas.length) return <section className="quiet-page-heading documents-summary" id="documents">
+    <span className="eyebrow">Образование</span>
+    <h1>Образование и дипломы</h1>
+    {data.profile.qualification?.trim() && <p className="pre-line">{data.profile.qualification}</p>}
+    <Empty>Документы об образовании пока не опубликованы.</Empty>
+    <Link to="/about" className="text-action">Об Анне <ArrowIcon /></Link>
+  </section>;
   return <>
     <section className="documents-hero grid">
       <span className="eyebrow">Анна Мысливцева / Образование</span>
@@ -949,8 +966,8 @@ export default function App() {
     if (pendingScroll.current === null) return;
     const target = pendingScroll.current;
     const anchor = typeof target === "object" ? document.getElementById(target.hash.slice(1)) : null;
-    // A cold deep link can arrive before its CMS-backed section is mounted.
-    if (typeof target === "object" && !anchor && !ready) return;
+    // CMS hydration can mount or move an existing anchor. The stable skip target is immediate.
+    if (typeof target === "object" && target.hash !== "#main" && !ready) return;
     return restorePageScroll({
       root: root.current,
       top: () => typeof target === "number" ? target : anchor ? Math.max(0, anchor.getBoundingClientRect().top + window.scrollY - parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop || "0")) : 0,

@@ -76,6 +76,8 @@ test('contact composition preserves only published details and uses monochrome i
   const html = render({phone:'+79000000001',email:'hello@example.invalid',address:'Тестовый адрес',hours:'Тестовые часы',mapUrl:'https://example.invalid/map',bookingUrl:'https://example.invalid/booking'});
   for (const text of ['Тестовый адрес','Тестовые часы','Место и формат приёма','Часы приёма','mailto:hello@example.invalid','https://example.invalid/map','https://example.invalid/booking']) assert.ok(html.includes(text));
   assert.match(html, /<svg[^>]*aria-hidden="true"/);
+  assert.ok(html.indexOf('Написать SMS') < html.indexOf('SMS откроется'));
+  assert.ok(html.indexOf('SMS откроется') < html.indexOf('mailto:hello@example.invalid'));
   assert.doesNotMatch(html, /↗|Удобное время|Онлайн-календарь|>А\.<|>К\.<|>С\.<|>—</);
   const empty = render({});
   assert.doesNotMatch(empty, /contact-visit|Часы приёма|Место и формат приёма|<a\s/);

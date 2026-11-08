@@ -19,6 +19,7 @@
 .contact-primary span:last-child { white-space: nowrap; }
 .contact-email > span { min-width: 0; }
 .contact-email > span > span { display: block; font-size: 13px; margin-top: 4px; }
+.contact-actions .contact-note { margin-top: 0; }
 .contact-note { font-size: 12px; line-height: 1.6; margin-top: 15px; max-width: 58ch; color: #485774; }
 .contact-visit { grid-column: 1/-1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 56px; padding: 28px 32px; border: 1px solid #dce1e8; border-radius: 18px; background: linear-gradient(115deg, #edf1f6, #f6f7f8); }
 .contact-visit > div:only-child { grid-column: 1/-1; max-width: 700px; }

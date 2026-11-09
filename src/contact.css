@@ -63,3 +63,7 @@
  .contact-intro .phone-circle-link { --phone-circle-size: 64px; }
  .contact-intro .contact-actions { gap: 16px; }
 }
+
+.callback-dialog { width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; padding: 28px; border: 1px solid var(--ink); background: var(--paper); color: var(--ink); }
+.callback-dialog::backdrop { background: rgb(0 0 0 / .55); }
+.callback-dialog .callback-form { margin-top: 20px; }

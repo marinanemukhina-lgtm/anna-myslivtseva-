@@ -3,6 +3,7 @@ const projectNumber = info => ({'contact-chromium-desktop': 0, 'contact-chromium
 
 test('call, explicit SMS and server-persisted callback reach protected owner inbox', async ({page}, testInfo) => {
   const failures=[]; page.on('pageerror',e=>failures.push(e.message));
+  let submissions=0; page.on('request',r=>{if(r.url().endsWith('/api/contact/callback')&&r.method()==='POST')submissions++;});
   await page.goto('/contact');
   const call=page.getByRole('link',{name:/Позвонить Анне/}).first();
   await expect(call).toHaveAttribute('href','tel:+79000000000');
@@ -16,9 +17,16 @@ test('call, explicit SMS and server-persisted callback reach protected owner inb
   const phone='+1 202 555 01'+String(10+projectNumber(testInfo)).padStart(2,'0');
   await input.fill(phone);
   await expect(page.getByRole('button',{name:'Перезвоните мне',exact:true})).toBeDisabled();
+  await expect(page.getByRole('checkbox')).not.toBeChecked();
+  await expect(page.locator('.callback-consent a')).toHaveCount(1);
+  await expect(page.locator('.callback-consent a')).toHaveAttribute('href','/callback-consent');
+  await expect(page.locator('.callback-privacy a')).toHaveAttribute('href','/privacy');
+  expect(await page.locator('.callback-privacy a').evaluate(el=>Boolean(el.closest('label')))).toBe(false);
+  await page.locator('.callback-form').evaluate(form=>form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+  expect(submissions).toBe(0);
   await page.getByRole('checkbox').check();
   await page.locator('.callback-form').screenshot({path:testInfo.outputPath('callback-form.png')});
-  let submissions=0; page.on('request',r=>{if(r.url().endsWith('/api/contact/callback')&&r.method()==='POST')submissions++;});
+
   await page.getByRole('button',{name:'Перезвоните мне',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Заявка сохранена'})).toBeVisible();
   expect(submissions).toBe(1);
@@ -44,6 +52,7 @@ test('call, explicit SMS and server-persisted callback reach protected owner inb
 test('lost response can retry without duplicating saved callback', async ({page},testInfo)=>{
   test.skip(testInfo.project.name !== 'contact-chromium-desktop', 'One stateful retry test; keep the shared synthetic fixture under the real rate limit.');
   await page.goto('/contact');
+  await page.getByRole('button',{name:'Оставить номер для звонка'}).click();
   await page.getByLabel('Ваш телефон',{exact:true}).fill('+1 202 555 01'+String(20+projectNumber(testInfo)).padStart(2,'0'));
   await page.getByRole('checkbox').check();
   let count=0;const keys=[];
@@ -57,6 +66,7 @@ test('lost response can retry without duplicating saved callback', async ({page}
   const handle=await page.evaluate(()=>sessionStorage.getItem('anna-callback-retry-v1'));
   expect(Object.keys(JSON.parse(handle)).sort()).toEqual(['consentVersion','requestId']);
   await page.reload();
+  await page.getByRole('button',{name:'Оставить номер для звонка'}).click();
   await page.getByLabel('Ваш телефон',{exact:true}).fill('+120255501'+String(20+projectNumber(testInfo)).padStart(2,'0'));
   await page.getByRole('checkbox').check();
   await page.getByRole('button',{name:'Перезвоните мне',exact:true}).click();
@@ -72,6 +82,7 @@ test('disabled, consent changes and failures do not claim success or send withou
   await expect(page.getByLabel('Ваш телефон',{exact:true})).toHaveCount(0);
   await page.unroute('**/api/contact/config');
   await page.reload();
+  await page.getByRole('button',{name:'Оставить номер для звонка'}).click();
   await page.getByLabel('Ваш телефон',{exact:true}).fill('+12025550199');
   await page.getByRole('checkbox').check();
   await page.route('**/api/contact/callback',route=>route.fulfill({status:409,json:{code:'CONSENT_CHANGED',error:'Условия изменились. Подтвердите новые условия.'}}));

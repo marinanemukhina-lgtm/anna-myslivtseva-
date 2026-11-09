@@ -12,13 +12,8 @@ import { normalizeCallbackPhone } from '../shared/callbacks.mjs';
 import { syntheticCallbackConsent } from './helpers/callback-policy.mjs';
 
 const source = await readFile(new URL('../src/CallbackForm.jsx', import.meta.url), 'utf8');
-const compiled = await transform(source
-  .replace('import React, { useEffect, useRef, useState } from "react";', '')
-  .replace('import { contactMethods } from "./contact-methods.mjs";', '')
-  .replace('import { normalizeCallbackPhone } from "../shared/callbacks.mjs";', '')
-  .replace('import "./contact.css";', '')
-  .replace('export default function CallbackForm', 'function CallbackForm'), { loader: 'jsx' });
-const CallbackForm = new Function('React', 'useEffect', 'useRef', 'useState', 'contactMethods', 'normalizeCallbackPhone', compiled.code + '; return CallbackForm;')(React, React.useEffect, React.useRef, React.useState, contactMethods, normalizeCallbackPhone);
+const { loadComponent } = await import('./load-contact-component.mjs');
+const {default:CallbackForm} = loadComponent('CallbackForm.jsx');
 
 test('separate callback section collects nothing before server configuration, retaining safe direct phone handling', () => {
   const html = renderToStaticMarkup(React.createElement(CallbackForm, { profile: { phone: '+7 (900) 000-00-01' } }));
@@ -35,7 +30,7 @@ test('callback uses the existing retry and consent contract without storing phon
   assert.match(source, /sessionStorage\.setItem\(retryStorageKey, JSON\.stringify\(operation\.current\)\)/);
   assert.match(source, /result\.ok !== true \|\| result\.requestId !== operation\.current\.requestId/);
   assert.match(source, /CONSENT_CHANGED/);
-  assert.match(source, /saved \? "Заявка сохранена"/);
+  assert.match(source, /saved \? [\"\']Заявка сохранена/);
   assert.doesNotMatch(source, /Заявка сохранена\./);
   assert.doesNotMatch(source, /localStorage|name="(?:name|email|message|diagnosis)"|messages\.map/);
 });
@@ -94,4 +89,12 @@ test('synthetic callback storage preserves CMS/social/legal text, private settin
   assert.equal(published.bookingOccupancy, undefined);
   assert.doesNotMatch(JSON.stringify(published), /447700900001|syntheticPrivateMarker|synthetic-session-identifier|unpublished working text/);
   assert.equal((await req('/api/admin/callbacks')).status, 401);
+});
+
+test('cached callback retry accepts only opaque contract fields',()=>{
+ const fn=source.slice(source.indexOf('function previousOperation()'),source.indexOf('export default function CallbackForm'));
+ const cached={requestId:'11111111-1111-4111-8111-111111111111',consentVersion:'a'.repeat(64),phone:'synthetic forbidden extra',diagnosis:'synthetic extra',consent:true};
+ const read=new Function('sessionStorage','retryStorageKey',fn+'; return previousOperation();');
+ assert.deepEqual(read({getItem:()=>JSON.stringify(cached)},'synthetic-key'),{requestId:cached.requestId,consentVersion:cached.consentVersion});
+ assert.equal(read({getItem:()=>JSON.stringify({...cached,consentVersion:'bad'})},'synthetic-key'),null);
 });

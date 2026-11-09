@@ -137,3 +137,25 @@ test("dialog keyboard wraps both boundaries without intercepting Escape", async 
  dialog.ownerDocument.activeElement=first; cycleDialogFocus({...event,shiftKey:true}); assert.equal(focused,last);
  cycleDialogFocus({...event,key:'Escape'}); assert.equal(prevented,2);
 });
+
+test("callback consent is separate from informational privacy policy",async()=>{
+ const source=await readFile(new URL('../src/CallbackForm.jsx',import.meta.url),'utf8');
+ const label=source.match(/<label className="callback-consent">[\s\S]*?<\/label>/)[0];
+ assert.match(label,/config.consentText/);
+ assert.match(label,/config.consentUrl/);
+ assert.doesNotMatch(label,/privacyUrl|Политика конфиденциальности/);
+ assert.match(source,/className="contact-note callback-privacy"/);
+ assert.match(source,/\[consent, setConsent\] = useState\(false\)/);
+ assert.match(source,/if \(pending.current \|\| !config\?\.enabled \|\| !consent\) return/);
+});
+
+test("callback modal is gated, single-form, uniquely labelled and busy-close protected",async()=>{
+ const source=await readFile(new URL('../src/CallbackForm.jsx',import.meta.url),'utf8');
+ assert.match(source,/const uid = useId\(\)/);
+ assert.match(source,/nativeDialog && \(config\?\.enabled \|\| modalOpen\)/);
+ assert.equal((source.match(/<form /g)||[]).length,1);
+ assert.match(source,/if\(pending.current\) \{ setCloseNotice\(true\); return;/);
+ assert.match(source,/onCancel=\{useModal \? event => \{ event.preventDefault\(\); closeDialog\(\)/);
+ assert.match(source,/setConsent\(false\); setCloseNotice\(false\)/);
+ assert.match(source,/unlock.current\?\.\(\)/);
+});

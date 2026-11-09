@@ -32,15 +32,17 @@ async function gotoWithPublishedContent(page, url, phone) {
 function observeCollection(page) {
   const requests = [];
   page.on('request', request => {
-    if (new URL(request.url()).pathname.startsWith('/api/contact/')) requests.push(request.url());
+    if (new URL(request.url()).pathname.startsWith('/api/contact/')) requests.push({ pathname: new URL(request.url()).pathname, method: request.method(), body: request.postData() });
   });
   return requests;
 }
 
 async function noIntake(page, requests) {
-  await expect(page.locator('form, input[type="tel"], #callback')).toHaveCount(0);
+  await expect(page.locator('form, input[type="tel"]')).toHaveCount(0);
+  await expect(page.locator('.callback-unavailable')).toContainText('пока не подключён');
   await expect(page.getByRole('button', { name: /Оставить номер|Перезвоните/ })).toHaveCount(0);
-  expect(requests).toEqual([]);
+  expect(requests.length).toBeGreaterThan(0);
+  expect(requests.every(request => request.pathname === '/api/contact/config' && request.method === 'GET' && request.body === null)).toBe(true);
   expect(await page.evaluate(() => sessionStorage.getItem('anna-callback-retry-v1'))).toBeNull();
 }
 
@@ -70,6 +72,8 @@ for (const [width, height] of [[320, 740], [390, 844], [1440, 960]]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await call.focus();
     await expect(call).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(section.locator('.contact-editorial__number')).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(sms).toBeFocused();
     // Never activate tel:/sms: handlers in automated tests.

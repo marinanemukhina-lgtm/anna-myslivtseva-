@@ -1,0 +1,58 @@
+name: Synthetic callback PostgreSQL checks
+
+on:
+  push:
+    branches: ["prep/anna-complete-contact-20261108"]
+  pull_request:
+    paths:
+      - '.github/workflows/callbacks-postgres.yml'
+      - 'tests/callbacks*.test.mjs'
+      - 'server/callbacks.mjs'
+      - 'server/db.mjs'
+      - 'shared/callbacks.mjs'
+      - 'package.json'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+# Disposable fixture only. No app deployment, repository write or real secrets.
+permissions:
+  contents: read
+
+jobs:
+  postgres-callbacks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: callback_synthetic
+          POSTGRES_PASSWORD: callback-synthetic-only
+          POSTGRES_DB: callback_synthetic
+        ports:
+          - '127.0.0.1:55433:5432'
+        options: >-
+          --health-cmd "pg_isready -U callback_synthetic -d callback_synthetic"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install official PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
+      - name: Install locked dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Verify actual row-lock overlap and callback durability
+        env:
+          DATABASE_URL: ''
+          CALLBACK_POSTGRES_TEST_ALLOW_WRITE: synthetic-only
+          CALLBACK_POSTGRES_TEST_URL: postgresql://callback_synthetic:callback-synthetic-only@127.0.0.1:55433/callback_synthetic
+        run: node --test --test-concurrency=1 tests/callbacks-postgres.test.mjs

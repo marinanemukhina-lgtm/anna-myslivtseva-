@@ -2,7 +2,7 @@
 export function contactMethods(profile = {}) {
   const displayPhone = typeof profile.phone === "string" ? profile.phone.trim() : "";
   const unavailable = { phone: "", displayPhone, smsHref: "" };
-  if (!displayPhone || displayPhone.length > 40 || !/^\+?[\d ().-]+$/.test(displayPhone)) return unavailable;
+  if (!displayPhone || displayPhone.length > 40 || !/^\+?[\d \u00a0().-]+$/.test(displayPhone)) return unavailable;
   let digits = displayPhone.replace(/[^\d+]/g, "");
   if (/^8\d{10}$/.test(digits)) digits = "+7" + digits.slice(1);
   else if (/^7\d{10}$/.test(digits)) digits = "+" + digits;

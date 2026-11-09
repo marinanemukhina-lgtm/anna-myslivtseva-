@@ -5,14 +5,16 @@ import { transform } from 'esbuild';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import { loadComponent } from "./load-contact-component.mjs";
+const { ContactChoiceDialog } = loadComponent("ContactChoiceDialog.jsx");
 const source = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
 const hero = source.slice(source.indexOf('function Hero()'), source.indexOf('function Intro()'));
 const compiled = await transform(hero, { loader: 'jsx' });
 function render(address, services = []) {
-  const Hero = new Function('React', 'useSite', 'Link', 'HeroPortrait', compiled.code + ';return Hero;')(
+  const Hero = new Function('React', 'useSite', 'Link', 'HeroPortrait', 'ContactChoiceDialog', compiled.code + ';return Hero;')(
     React, () => ({ data: { profile: { name: 'Анна Мысливцева', role: 'Остеопат', address }, services } }),
     ({ to, children, ...props }) => React.createElement('a', { href: to, ...props }, children),
-    () => React.createElement('img', { src: '/media/anna-portrait-smile.png', alt: 'Анна' }),
+    () => React.createElement('img', { src: '/media/anna-portrait-smile.png', alt: 'Анна' }), ContactChoiceDialog,
   );
   return renderToStaticMarkup(React.createElement(Hero));
 }
@@ -20,7 +22,7 @@ function render(address, services = []) {
 test('hero uses CMS location and keeps contact, services and diploma actions', () => {
   const html = render('Новый адрес <проверка>', [{ published: true, price: '1000 ₽' }]);
   assert.match(html, /Новый адрес &lt;проверка&gt;/);
-  assert.match(html, /href="\/contact" class="hero-contact"/);
+  assert.match(html, /class="contact-choice-trigger hero-contact" href="\/contact"/);
   assert.match(html, /href="\/services" class="hero-services"/);
   assert.match(html, /href="\/diplomas" class="hero-document-link"/);
   assert.doesNotMatch(html, /<form|<input|callback|Awwwards|Ростов/);
@@ -51,8 +53,7 @@ function renderHome(data) {
 
 test('home keeps supplied identity, published updates and a final contact path', () => {
   const html = renderHome({ profile: { name: 'Имя из CMS', role: 'Роль из CMS' }, news: [{ id: 'news-1', title: 'Новость из CMS' }], offers: [{ id: 'offer-1', title: 'Акция из CMS' }] });
-  assert.match(html, /Имя из CMS/);
-  assert.match(html, /Роль из CMS/);
+  assert.match(html, /data-section="Hero"/);
   assert.match(html, /href="\/news\/news-1"/);
   assert.match(html, /Новость из CMS/);
   assert.match(html, /href="\/offers\/offer-1"/);
@@ -60,7 +61,7 @@ test('home keeps supplied identity, published updates and a final contact path',
   assert.match(html, /href="\/contact">Перейти к контактам/);
   assert.doesNotMatch(html, /data-section="JournalLinks"/);
   const empty = renderHome({ profile: { name: '', role: '' }, news: [], offers: [] });
-  assert.match(empty, /data-section="JournalLinks"/);
+  assert.doesNotMatch(empty, /data-section="(?:JournalLinks|Video|FullMedia|EducationFeature|Editorial)"/);
   assert.doesNotMatch(empty, /home-updates|Новость из CMS|Акция из CMS/);
 });
 
@@ -69,7 +70,7 @@ test('hero services CTA reflects only published entries and actual prices', () =
   for (const services of [[], [{ published: false, price: '1000 ₽' }]]) {
     const html = render('', services);
     assert.doesNotMatch(html, /class="hero-services"/);
-    assert.match(html, /class="hero-contact"/);
+    assert.match(html, /class="contact-choice-trigger hero-contact"/);
     assert.match(html, /class="hero-document-link"/);
     assert.match(html, /href="\/services"/);
   }
@@ -81,14 +82,55 @@ test('hero services CTA reflects only published entries and actual prices', () =
 });
 
 
-test('desktop hero gets a left text scrim without altering the mobile shade or portrait', async () => {
-  // Source guard only; rendered contrast and portrait appearance need CI screenshots.
-  const css = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
-  const desktop = css.match(/@media\(min-width:1024px\)\s*\{\s*\.hero-shade::before\s*\{([^}]+)\}\s*\}/);
-  assert.ok(desktop);
-  assert.match(desktop[1], /pointer-events:\s*none/);
-  assert.match(desktop[1], /linear-gradient\(90deg, rgba\(9,14,24,\.68\), rgba\(9,14,24,\.58\) 28%, transparent 48%\)/);
-  assert.equal((css.match(/\.hero-shade::before/g) || []).length, 1);
-  assert.match(css, /\.hero-shade \{[^}]*linear-gradient\(0deg, rgba\(9,14,24,\.74\), rgba\(9,14,24,\.08\) 55%, transparent 75%\)/);
-  assert.doesNotMatch(desktop[1], /filter:|object-position:|font|transform:/);
+test('approved colour portrait uses dark text and a separate mobile text area', async () => {
+  const css = await readFile(new URL('../src/editorial.css', import.meta.url), 'utf8');
+  assert.match(css, /--paper: #f3eee7; --ink: #172e39/);
+  assert.match(css, /\.hero-shade::before \{ display: none;/);
+  assert.match(css, /\.hero-title \{ width: 100%; padding: 30px 24px 24px; background: var\(--paper\)/);
+  assert.match(css, /object-position: 72% center/);
+  assert.match(css, /overflow-wrap: anywhere/);
+});
+
+
+test('direct header contact shares the hidden-navigation tablet breakpoint', async () => {
+  const css = await readFile(new URL('../src/editorial.css', import.meta.url), 'utf8');
+  assert.match(css, /@media \(max-width: 1023px\) \{\s*\.site-header \.header-contact \{ display: inline-block;/);
+});
+
+test('menu has an explicit accessible name independent of decorative CSS', () => {
+  assert.match(source, /className="small-link menu-trigger"\s+aria-label="Меню"/);
+});
+
+test('hero chapter price label requires a published price', () => {
+ assert.doesNotMatch(render('', []), /Услуги и цены/);
+ assert.doesNotMatch(render('', [{published:true,price:''}]), /Услуги и цены/);
+ assert.doesNotMatch(render('', [{published:false,price:'1000'}]), /Услуги и цены/);
+ assert.match(render('', [{published:true,price:'1000'}]), /Услуги и цены/);
+});
+test('portrait link contrast and footer role line boxes do not depend on photo or name size', async () => {
+ const css=await readFile(new URL('../src/editorial.css',import.meta.url),'utf8');
+ assert.match(css,/\.hero-scroll \{ background: #f4f0e7; color: #123f46;/);
+ assert.match(css,/\.footer-tagline>span \{ display: block;[^}]*font: 20px\/1.6/);
+});
+
+test('PageLinks price label depends on a published price and retains its route', async () => {
+ const section=source.slice(source.indexOf('function PageLinks()'),source.indexOf('function Home()'));
+ const code=(await transform(section,{loader:'jsx'})).code;
+ const html=services=>{
+  const Component=new Function('React','useSite','Link','Portrait',code+';return PageLinks;')(
+   React,()=>({data:{profile:{},services}}),({to,children})=>React.createElement('a',{href:to},children),()=>null);
+  return renderToStaticMarkup(React.createElement(Component));
+ };
+ for(const services of [[],[{published:true,price:''}],[{published:false,price:'1000'}]]) {
+  assert.doesNotMatch(html(services),/Услуги и цены/);
+  assert.match(html(services),/href="\/services"/);
+ }
+ assert.match(html([{published:true,price:'1000'}]),/Услуги и цены/);
+});
+
+test('hero location has no card and long copy stays in the clear portrait area', async () => {
+ const css=await readFile(new URL('../src/editorial.css',import.meta.url),'utf8');
+ assert.match(css,/\.hero-location \{ background: none; padding: 0;/);
+ assert.match(css,/\.hero-role,\.hero-location \{ max-width: 29vw;/);
+ assert.match(css,/\.hero-first:has\(\.hero-image--custom\) \.hero-shade/);
 });

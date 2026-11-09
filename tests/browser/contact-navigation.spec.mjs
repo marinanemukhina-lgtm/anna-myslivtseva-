@@ -32,7 +32,7 @@ for (const width of [320,390,1440]) {
     await fixture(page);
     const writes = [], errors = [], intake = [];
     page.on('pageerror', error => errors.push(error.message));
-    page.on('request', r => { if (new URL(r.url()).pathname.startsWith('/api/contact/')) intake.push(r.url()); if (r.method() !== 'GET' && r.method() !== 'HEAD') writes.push(r.url()); });
+    page.on('request', r => { if (new URL(r.url()).pathname.startsWith('/api/contact/')) intake.push({ pathname: new URL(r.url()).pathname, method: r.method(), body: r.postData() }); if (r.method() !== 'GET' && r.method() !== 'HEAD') writes.push(r.url()); });
     await page.goto('/');
     const footerChannel = page.locator('footer').getByRole('link',{name:/Канал в Telegram/});
     await expect(footerChannel).toHaveAttribute('href',telegram);
@@ -46,7 +46,8 @@ for (const width of [320,390,1440]) {
     await expect(channel).toHaveAttribute('rel','noopener noreferrer');
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button',{name:'Меню',exact:true})).toBeFocused();
-    await page.locator('.site-header .book-link').click();
+    await page.getByRole('button',{name:'Меню',exact:true}).click();
+    await menu.getByRole('link',{name:/Запись на приём/}).click();
     await expect(page).toHaveURL(/\/contact$/);
     await expect(page.locator('.contact-intro').getByRole('link',{name:/Канал в Telegram/})).toHaveAttribute('href',telegram);
     await page.goBack();
@@ -61,28 +62,33 @@ for (const width of [320,390,1440]) {
     await mainChannel.focus();
     await expect(mainChannel).toBeFocused();
     expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await expect(page.locator('.contact-editorial__number')).toHaveAttribute('href','tel:+79000000001');
+    await expect(page.locator('.contact-editorial__sms')).toHaveAttribute('href','sms:+79000000001');
+    await expect(page.locator('.contact-section')).toHaveCount(0);
     if (width <= 390) {
       await page.evaluate(() => document.fonts.ready);
       const footerGrid = await page.locator('.footer-grid').boundingBox();
       const footerContacts = await page.locator('footer .contacts').boundingBox();
       expect(Math.abs(footerContacts.width - footerGrid.width)).toBeLessThanOrEqual(1);
-      for (const scope of ['.contact-section', 'footer']) {
-        const labels = page.locator(`${scope} .contacts > div > span`).filter({hasText:/^SMS$/});
+      for (const scope of ['footer']) {
+        const labels = page.locator(`${scope} .contacts a[href^="sms:"]`);
         const phone = page.locator(`${scope} .contacts a[href="tel:+79000000001"]`);
         for (const text of [labels, phone]) {
           await expect(text).toBeVisible();
           expect(await text.evaluate(element => {
             const range = document.createRange();
             range.selectNodeContents(element);
-            return range.getClientRects().length;
-          })).toBe(1);
+            return [...range.getClientRects()].every(rect => rect.left >= 0 && rect.right <= innerWidth + 1);
+          })).toBe(true);
         }
       }
     }
 
-    await expect(page.locator('input[type="tel"], #callback')).toHaveCount(0);
+    await expect(page.locator('form, input[type="tel"]')).toHaveCount(0);
+    await expect(page.locator('.callback-unavailable')).toContainText('пока не подключён');
     expect(writes).toEqual([]);
-    expect(intake).toEqual([]);
+    expect(intake.length).toBeGreaterThan(0);
+    expect(intake.every(request => request.pathname === '/api/contact/config' && request.method === 'GET' && request.body === null)).toBe(true);
     expect(errors).toEqual([]);
     // Do not activate external apps or send actual messages.
     await page.screenshot({path:testInfo.outputPath(`channel-contact-${width}.png`),fullPage:true});
@@ -95,7 +101,7 @@ test('empty, removed and invalid structured links are hidden everywhere', async 
     await fixture(page,socialLinks);
     const loaded = await gotoContent(page, '/contact');
     expect(loaded.profile.socialLinks).toEqual(socialLinks);
-    await expect(page.locator('.contact-intro a[href="tel:+79000000001"]')).toBeVisible();
+    await expect(page.locator('.contact-intro .phone-circle-link')).toBeVisible();
     await expect(page.locator('.social-links')).toHaveCount(0);
     await page.getByRole('button',{name:'Меню',exact:true}).click();
     await expect(page.getByRole('dialog').getByRole('button',{name:'Закрыть',exact:true})).toBeFocused();

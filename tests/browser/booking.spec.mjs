@@ -186,9 +186,12 @@ test('preview uses its returned timezone when saved settings changed elsewhere',
 
 base('contact has an honest unavailable state and no personal-data form', async ({ page }) => {
   const writes = [];
-  page.on('request', request => { if (request.url().includes('/api/booking/') && request.method() !== 'GET') writes.push(request.url()); });
+  page.on('request', request => { if ((request.url().includes('/api/booking/') || request.url().includes('/api/contact/callback')) && !['GET', 'HEAD'].includes(request.method())) writes.push(request.url()); });
   await page.goto('/contact');
-  await expect(page.locator('.booking-unavailable')).toContainText('пока не открыт');
-  await expect(page.locator('.booking-section input')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Контакты', exact: true })).toBeVisible();
+  await expect(page.locator('main')).toContainText('Телефон для связи пока не опубликован.');
+  await expect(page.locator('.callback-unavailable')).toContainText('Обратный звонок пока не подключён');
+  await expect(page.locator('.callback-section')).not.toContainText('Воспользуйтесь прямой связью');
+  await expect(page.locator('main form, main input')).toHaveCount(0);
   expect(writes).toEqual([]);
 });

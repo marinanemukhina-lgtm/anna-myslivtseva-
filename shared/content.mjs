@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { callbackDocumentSchema, callbackDocumentDefaults, callbackDocument } from "./callbacks.mjs";
+import { safeDirectionsUrl } from "./contact-ui-links.mjs";
 import { defaults as bookingDefaults, settingsSchema } from "./booking.mjs";
 const text = z.string().max(50000),
   short = z.string().max(500),
@@ -39,13 +41,17 @@ export const contentSchema = z.object({
     phone: short,
     email: z.union([z.literal(""), z.email()]),
     address: short,
+    officeAddress: short.default(""),
+    directionsUrl: z.string().max(2000).refine(s => !s || Boolean(safeDirectionsUrl(s)), "Укажите безопасную HTTPS-ссылку на маршрут").default(""),
     hours: text,
     bookingUrl: link,
     mapUrl: link,
     socialUrl: link,
     socialLinks: z.object({telegram:link.default(""),max:link.default(""),vk:link.default(""),instagram:link.default(""),whatsapp:link.default("")}).optional(),
     portrait: media,
+    heroPortrait: media.default(""),
     heroPosition: z.number().min(0).max(100),
+    callbackConsent: callbackDocumentSchema.default(callbackDocumentDefaults),
     privacy: text,
     terms: text,
   }),
@@ -94,12 +100,16 @@ export const initialContent = {
     phone: "",
     email: "",
     address: "",
+    officeAddress: "",
+    directionsUrl: "",
     hours: "",
     bookingUrl: "",
     mapUrl: "",
     socialUrl: "",
     portrait: "/media/anna-portrait.jpg",
+    heroPortrait: "",
     heroPosition: 0,
+    callbackConsent: { ...callbackDocumentDefaults },
     privacy: "",
     terms: "",
   },
@@ -110,8 +120,11 @@ export const initialContent = {
 };
 export function publicContent(data) {
   const { bookingSchedule: _privateSchedule, bookingOccupancy: _privateOccupancy, ...visible } = data;
+  const { callbackConsent: _consentDraft, ...publicProfile } = data.profile;
+  const consent = callbackDocument(data.profile);
   return {
     ...visible,
+    profile: consent ? { ...publicProfile, callbackConsent: consent } : publicProfile,
     services: data.services.filter((x) => x.published),
     news: data.news.filter((x) => x.published),
     offers: data.offers.filter((x) => x.published),

@@ -46,6 +46,8 @@ test('Russian dictation appends once, allows correction, saves locally and isola
   await expect(field).toHaveValue('Тест: первое наблюдение. второе наблюдение.');
   await field.fill('Тест: проверенный текст <b>без HTML</b>.');
   await page.getByRole('button', { name: 'Сохранить процедуру' }).click();
+  await expect(page.getByRole('status')).toContainText('Сохранено в этом браузере.');
+  await expect(page.getByRole('textbox', { name: 'Заметка к посещению' })).toHaveValue('');
   await expect(field).toHaveValue('');
   await page.reload();
   await expect(page.locator('.clinical-visit').first()).toContainText('Тест: проверенный текст <b>без HTML</b>.');
@@ -97,6 +99,8 @@ test('without recognition, keyboard notes remain editable and persist', async ({
   await expect(page.getByRole('button', { name: 'Надиктовать', exact: true })).toHaveCount(0);
   await page.getByRole('textbox', { name: 'Заметка к посещению' }).fill('Тест с клавиатуры.');
   await page.getByRole('button', { name: 'Сохранить процедуру' }).click();
+  await expect(page.getByRole('status')).toContainText('Сохранено в этом браузере.');
+  await expect(page.getByRole('textbox', { name: 'Заметка к посещению' })).toHaveValue('');
   await page.reload();
   await expect(page.locator('.clinical-visit').first()).toContainText('Тест с клавиатуры.');
 });
@@ -114,6 +118,8 @@ test('interim-only speech remains editable after dictation ends and can be saved
   await expect(page.getByText(/Неподтверждённые слова оставлены в поле/)).toBeVisible();
   await field.fill('Исправленный синтетический текст.');
   await page.getByRole('button',{name:'Сохранить процедуру'}).click();
+  await expect(page.getByRole('status')).toContainText('Сохранено в этом браузере.');
+  await expect(field).toHaveValue('');
   await page.reload();
   await expect(page.locator('.clinical-visit').first()).toContainText('Исправленный синтетический текст.');
 });

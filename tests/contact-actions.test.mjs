@@ -7,18 +7,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { contactMethods } from "../src/contact-methods.mjs";
 import { publicSocialLinks } from "../shared/contact-links.mjs";
 
-const socialSource = await readFile(new URL("../src/SocialLinks.jsx", import.meta.url), "utf8");
-const socialCompiled = await transform(socialSource.replace("import React from 'react';", "").replace("import { publicSocialLinks } from '../shared/contact-links.mjs';", "").replace("export default function SocialLinks", "function SocialLinks"), {loader: 'jsx'});
-const SocialLinks = new Function('React', 'publicSocialLinks', socialCompiled.code + ';return SocialLinks;')(React, publicSocialLinks);
+import { loadComponent } from "./load-contact-component.mjs";
+const { default: ContactActions } = loadComponent("ContactActions.jsx");
 const source = await readFile(new URL("../src/ContactActions.jsx", import.meta.url), "utf8");
-const transformed = await transform(source
-  .replace('import React from "react";', "")
-  .replace('import SocialLinks from "./SocialLinks.jsx";', "")
-  .replace('import { publicSocialLinks } from "../shared/contact-links.mjs";', "")
-  .replace('import { contactMethods } from "./contact-methods.mjs";', "")
-  .replace('import "./contact.css";', "")
-  .replace("export default function ContactActions", "function ContactActions"), { loader: "jsx" });
-const ContactActions = new Function("React", "contactMethods", "SocialLinks", "publicSocialLinks", transformed.code + ";return ContactActions;")(React, contactMethods, SocialLinks, publicSocialLinks);
 const render = (profile) => renderToStaticMarkup(React.createElement(ContactActions, { profile }));
 
 test("direct contact component renders explicit phone and device SMS links from the supplied profile", () => {
@@ -50,12 +41,12 @@ test("component has no form, collection, retry storage, request hooks or invente
   assert.doesNotMatch(source, /fetch\s*\(|XMLHttpRequest|sendBeacon|localStorage|sessionStorage|useEffect|useState|\/api\//);
 });
 
-test("contact integration keeps Booking and backend separation intact", async () => {
+test("contact integration keeps direct links and gated callback without duplicate closed booking", async () => {
   const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
   const contact = app.slice(app.indexOf("function Contact()"), app.indexOf("function Legal("));
-  assert.match(contact, /<ContactActions profile=\{p\} \/>\s*<Booking profile=\{p\} \/>/);
-  assert.match(contact, /<Contacts profile=\{p\} \/>/);
-  assert.doesNotMatch(contact, /callback|fetch\s*\(/i);
+  assert.match(contact, /<ContactActions profile=\{p\} \/>\s*<CallbackForm profile=\{p\} \/>/);
+  assert.doesNotMatch(contact, /<Booking|<Contacts|contact-section/);
+  assert.doesNotMatch(contact, /fetch\s*\(/i);
 });
 
 test('published socials are explicit channel links, not personal chat promises', () => {

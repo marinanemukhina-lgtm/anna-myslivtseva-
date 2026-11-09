@@ -1614,7 +1614,7 @@ html { scroll-padding-top: 110px; }
 .site-header .menu-trigger { margin: 0; order: 3; }
 .home-hero { height: auto; padding-top: 86px; }
 .hero-first { min-height: max(650px, calc(100svh - 86px)); height: auto; display: flex; flex-direction: column; justify-content: flex-end; padding: 260px var(--gutter) 30px; position: relative; overflow: hidden; background: #c7bbae; }
-.hero-image { position: absolute; inset: 0; height: 100%; object-position: 50% 0% !important; }
+.hero-image { position: absolute; inset: 0; height: 100%; object-position: 50% 0%; }
 .hero-shade { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(9,14,24,.74), rgba(9,14,24,.08) 55%, transparent 75%); }
 @media(min-width:1024px) {
   .hero-shade::before {

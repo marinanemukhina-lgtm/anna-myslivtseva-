@@ -13,10 +13,16 @@ import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
 import Booking from "./Booking.jsx";
 import ContactActions from "./ContactActions.jsx";
+import { ContactChoiceDialog } from "./ContactChoiceDialog.jsx";
+import { OfficeDirections } from "./OfficeDirections.jsx";
+import CallbackForm from "./CallbackForm.jsx";
 import SocialLinks from "./SocialLinks.jsx";
 import { contactMethods } from "./contact-methods.mjs";
 import { publicSocialLinks, safePublicUrl } from "../shared/contact-links.mjs";
 import "./styles.css";
+import "./editorial.css";
+import { callbackDocument } from "../shared/callbacks.mjs";
+import { isDocumentScrollLocked } from "./dialog-scroll-lock.mjs";
 gsap.registerPlugin(ScrollTrigger);
 const Site = createContext(null);
 export function useSite() {
@@ -116,45 +122,34 @@ function Contacts({ compact = false, profile }) {
   const { data } = useSite();
   const p = profile || data.profile;
   const { phone, smsHref } = contactMethods(p);
-  if (!p.address && !phone && !p.email && !publicSocialLinks(p).length) return null;
-  return (
-    <div className={"contacts " + (compact ? "compact" : "")}>
-      <div>
-        <span>А.</span>
-        <p>
-          {p.address || "—"}
-          {safePublicUrl(p.mapUrl) && (
-            <>
-              <br />
-              <a href={safePublicUrl(p.mapUrl)} target="_blank" rel="noreferrer">
-                Как добраться
-              </a>
-            </>
-          )}
-        </p>
-      </div>
-      <div>
-        <span>К.</span>
-        <p>
-          {p.email ? <a href={"mailto:" + p.email}>{p.email}</a> : "—"}
-          <br />
-          {phone ? (
-            <a href={"tel:" + phone}>{p.phone}</a>
-          ) : (
-            "—"
-          )}
-        </p>
-      </div>
-      {smsHref && <div><span>SMS</span><a href={smsHref}>Написать SMS</a></div>}
-      {publicSocialLinks(p).length > 0 && <div><span>С.</span><SocialLinks profile={p} /></div>}
-    </div>
-  );
+  if (!p.address && !p.officeAddress && !phone && !p.email && !publicSocialLinks(p).length) return null;
+  return <div className={"contacts " + (compact ? "compact" : "")}>
+    {p.address && <div><span>Место приёма</span><p className="pre-line">{p.address}</p></div>}
+    <OfficeDirections officeAddress={p.officeAddress} directionsUrl={p.directionsUrl} />
+    {(phone || p.email) && <div><span>Для записи</span>
+      {phone && <p><a href={"tel:" + phone}>{p.phone}</a></p>}
+      {p.email && <p><a href={"mailto:" + p.email}>{p.email}</a></p>}
+    </div>}
+    {smsHref && <div><a href={smsHref}>Написать SMS <span aria-hidden="true">↗</span></a></div>}
+    {publicSocialLinks(p).length > 0 && <div><SocialLinks profile={p} /></div>}
+  </div>;
 }
 function Header({ isHome }) {
   const { data, path, menu, setMenu } = useSite();
   const [scrolled, setScrolled] = useState(false);
   const ref = useRef(null),
+    headerRef = useRef(null),
     lastFocus = useRef(null);
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (!header) return;
+    const measure = () => document.documentElement.style.setProperty("--header-height", Math.ceil(header.getBoundingClientRect().height) + "px");
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    observer?.observe(header);
+    window.addEventListener("resize", measure);
+    return () => { observer?.disconnect(); window.removeEventListener("resize", measure); document.documentElement.style.removeProperty("--header-height"); };
+  }, []);
   useEffect(() => {
     const fn = () =>
       setScrolled(
@@ -202,24 +197,25 @@ function Header({ isHome }) {
   return (
     <>
       <header
-        className={`site-header ${scrolled || /^\/contact\/?$/.test(path) ? "scrolled" : ""}`}
+        ref={headerRef}
+        className={`site-header ${scrolled || /^\/contact\/?$/.test(path) ? "scrolled" : ""} ${path === "/services" ? "site-header--petrol" : ""}`}
       >
         <Brand />
         <nav className="header-navigation" aria-label="Разделы сайта">
           <Link to="/about">Об Анне</Link>
-          <Link to="/services">Услуги и цены</Link>
-          <Link to="/diplomas">Дипломы</Link>
+          <Link to="/services">Услуги</Link>
+          <Link to="/diplomas">Образование</Link>
+          <Link to="/contact">Контакты</Link>
         </nav>
         <button
           className="small-link menu-trigger"
+          aria-label="Меню"
           onClick={() => setMenu(true)}
           aria-expanded={menu}
         >
           Меню
         </button>
-        <Link className="small-link book-link" to="/contact">
-          Запись<span> на приём</span>
-        </Link>
+        <ContactChoiceDialog phone={data.profile.phone} triggerClassName="header-contact" />
       </header>
       <div
         className={"menu-backdrop " + (menu ? "visible" : "")}
@@ -264,9 +260,9 @@ function Footer() {
       <p className="footer-tagline">{data.profile.name}<br /><span>{data.profile.role}</span></p>
       <div className="footer-grid">
         <Contacts />
-        {!data.profile.address && !contactMethods(data.profile).phone && !data.profile.email && !publicSocialLinks(data.profile).length && <p className="footer-contact-note">Контакты для записи пока не опубликованы.</p>}
+        {!data.profile.address && !data.profile.officeAddress && !contactMethods(data.profile).phone && !data.profile.email && !publicSocialLinks(data.profile).length && <p className="footer-contact-note">Контакты для записи пока не опубликованы.</p>}
         <div className="hours">
-          <span className="eyebrow">Часы приёма</span>
+          {data.profile.hours && <span className="eyebrow">Часы приёма</span>}
           {data.profile.hours ? (
             <p className="pre-line">{data.profile.hours}</p>
           ) : null}
@@ -285,44 +281,16 @@ function Footer() {
         <Link to="/admin">Вход</Link>
       </div>
       <Link to="/contact" className="small-link footer-contact-link">Связаться с Анной</Link>
-      <Link to="/contact" className="footer-marquee">
-        <span>
-          Записаться на приём&nbsp;&nbsp;&nbsp; Записаться на
-          приём&nbsp;&nbsp;&nbsp;{" "}
-        </span>
-        <span aria-hidden="true">
-          Записаться на приём&nbsp;&nbsp;&nbsp; Записаться на
-          приём&nbsp;&nbsp;&nbsp;{" "}
-        </span>
-      </Link>
+      <Link to="/contact" className="footer-marquee"><span>Записаться на приём</span><span aria-hidden="true">↗</span></Link>
     </footer>
   );
 }
 function HeroPortrait() {
-  const { data, motion, setMotion } = useSite();
-  const ref = useRef(null);
-  const [ready, setReady] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const original = !data.profile.portrait || ["/media/anna-portrait.jpg", "/media/anna-portrait-smile.png"].includes(data.profile.portrait);
-  useEffect(() => {
-    const video = ref.current;
-    if (!video || !original || failed) return;
-    let visible = true;
-    const sync = () => {
-      if (motion && visible && !document.hidden) video.play().catch(() => setReady(false));
-      else video.pause();
-    };
-    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; sync(); }, { threshold: 0.1 });
-    observer.observe(video);
-    document.addEventListener("visibilitychange", sync);
-    sync();
-    return () => { observer.disconnect(); document.removeEventListener("visibilitychange", sync); video.pause(); };
-  }, [motion, original, failed]);
-  return <>
-    <Portrait className="hero-image" loading="eager" fetchPriority="high" />
-    {original && !failed && <video ref={ref} className={"hero-image hero-portrait-video" + (ready && motion ? " is-playing" : "")} src="/media/anna-portrait-calm.mp4" poster="/media/anna-portrait-smile.png" muted loop playsInline preload={motion ? "auto" : "none"} aria-hidden="true" onPlaying={() => setReady(true)} onError={() => setFailed(true)} />}
-    {original && !failed && <button className="portrait-motion-toggle" onClick={() => setMotion(!motion)} aria-label={motion ? "Остановить анимацию портрета" : "Включить анимацию портрета"}><span aria-hidden="true">{motion ? "Ⅱ" : "▷"}</span><span>{motion ? "Пауза" : "Оживить портрет"}</span></button>}
-  </>;
+  const { data } = useSite();
+  const p = data.profile;
+  const custom = p.portrait && !["/media/anna-portrait.jpg", "/media/anna-portrait-smile.png"].includes(p.portrait);
+  const src = p.heroPortrait || (custom ? p.portrait : "/media/anna-hero-petrol-clean-v1.png");
+  return <img className={"hero-image" + (!p.heroPortrait && !custom ? " hero-image--stock" : " hero-image--custom")} src={src} alt={p.name} loading="eager" fetchPriority="high" style={p.heroPortrait || custom ? { objectPosition: `50% ${p.heroPosition ?? 0}%` } : undefined} />;
 }
 function Hero() {
   const { data } = useSite();
@@ -334,21 +302,21 @@ function Hero() {
         <HeroPortrait />
         <div className="hero-shade" />
         <div className="hero-title">
-          <span className="eyebrow">{data.profile.role}</span>
           <h1><span>{names[0]}</span><span>{names.slice(1).join(" ")}</span></h1>
+          {data.profile.role && <p className="hero-role">{data.profile.role}</p>}
           {data.profile.address && <p className="hero-location pre-line">{data.profile.address}</p>}
           <div className="hero-actions">
-            <Link to="/contact" className="hero-contact">Связаться с Анной</Link>
+            <ContactChoiceDialog phone={data.profile.phone} triggerClassName="hero-contact" />
             {services.length > 0 && <Link to="/services" className="hero-services">{services.some(service => service.price.trim()) ? "Услуги и стоимость" : "Услуги"}</Link>}
           </div>
         </div>
         <div className="hero-bottom">
           <Link to="/diplomas" className="hero-document-link">Образование и дипломы</Link>
-          <a href="#introduction" className="hero-scroll">Познакомиться <span aria-hidden="true">↓</span></a>
+          <Link to="/about" className="hero-scroll">Познакомиться <span aria-hidden="true">↗</span></Link>
         </div>
       </div>
       <nav className="hero-chapters" aria-label="Навигация первого экрана">
-        <Link to="/services"><span>01</span> Услуги и цены</Link>
+        <Link to="/services"><span>01</span> {services.some(service => service.price.trim()) ? "Услуги и цены" : "Услуги"}</Link>
         <Link to="/about"><span>02</span> Об Анне</Link>
         <Link to="/diplomas"><span>03</span> Дипломы</Link>
         <Link to="/contact"><span>04</span> Запись на приём</Link>
@@ -364,9 +332,9 @@ function Intro() {
       <h2 className="intro-title reveal">
         {data.profile.intro || (
           <>
-            Познакомиться.<br />
-            Узнать больше.<br />
-            Сделать свой выбор.
+            Познакомиться<br />
+            Узнать больше<br />
+            Сделать свой выбор
           </>
         )}
       </h2>
@@ -421,7 +389,7 @@ function Editorial({ kind = "philosophy" }) {
         <h3 className="reveal">
           {copy || (
             <>
-              {kind === "philosophy" ? "Прежде чем записаться — познакомьтесь со специалистом и его образованием." : "Информация об услугах, стоимости и записи. В одном месте, в вашем ритме."}
+              {kind === "philosophy" ? "Прежде чем записаться — познакомьтесь со специалистом и его образованием" : "Информация об услугах, стоимости и записи. В одном месте, в вашем ритме"}
             </>
           )}
         </h3>
@@ -438,7 +406,7 @@ function Feature() {
   const { data } = useSite();
   return (
     <section className="feature grid">
-      <h2 className="reveal">За каждым<br />приёмом —<br />человек.</h2>
+      <h2 className="reveal">За каждым<br />приёмом —<br />человек</h2>
       <div className="feature-small">
         <Video second />
         <p>{data.profile.approach || "Познакомьтесь с Анной: биография и сведения об образовании собраны на отдельной странице."}</p>
@@ -461,7 +429,7 @@ function PageLinks() {
       <div className="link-pictures">
         <Link to="/services">
           <img src="/media/session-neutral-01.jpg" alt="" loading="lazy" />
-          <span>Услуги и цены</span>
+          <span>{data.services.some(service => service.published && service.price.trim()) ? "Услуги и цены" : "Услуги"}</span>
         </Link>
         <Link to="/about">
           <Portrait loading="lazy" />
@@ -476,16 +444,7 @@ function Home() {
   return (
     <>
       <Hero />
-      <Intro />
-      <div className="hero-second">
-        <Video />
-        <div className="film-caption"><span className="eyebrow">{data.profile.name}</span><p>В процессе<br />работы.</p><span className="eyebrow">{data.profile.role}</span></div>
-      </div>
-      <EducationFeature />
-      <Editorial />
-      <Feature />
-      <FullMedia single />
-      <Editorial kind="approach" />
+      {data.profile.intro?.trim() && <section className="home-introduction" id="introduction"><p className="pre-line">{data.profile.intro}</p><Link to="/about" className="text-action">Об Анне <span aria-hidden="true">↗</span></Link></section>}
       {(data.news.length > 0 || data.offers.length > 0) && (
         <div className="home-updates">
           <h2 className="eyebrow">Новости и акции</h2>
@@ -505,7 +464,6 @@ function Home() {
           </div>
         </div>
       )}
-      {!data.news.length && !data.offers.length && <JournalLinks />}
       <section className="home-next editorial grid" aria-labelledby="home-next-title">
         <h2 id="home-next-title">Связаться с Анной</h2>
         <div>
@@ -519,7 +477,7 @@ function Home() {
 function EducationFeature() {
   const { data } = useSite();
   return <section className="education-feature grid">
-    <div className="education-heading"><span className="eyebrow">Образование и квалификация</span><h2 className="reveal">Образование<br />и дипломы.</h2></div>
+    <div className="education-heading"><span className="eyebrow">Образование и квалификация</span><h2 className="reveal">Образование<br />и дипломы</h2></div>
     <div className="education-description"><p>Дипломы и сертификаты Анны — в отдельном разделе. Каждый опубликованный документ можно рассмотреть в полном размере.</p><Link to="/diplomas" className="text-action">Посмотреть дипломы <span aria-hidden="true">↗</span></Link></div>
     <div className="education-foot"><span>{data.profile.name}</span><span>{data.diplomas.length ? `${data.diplomas.length} документов` : "Образование · Дипломы · Сертификаты"}</span></div>
   </section>;
@@ -592,8 +550,18 @@ function Services() {
   };
   return (
     <>
-      <PageHero first="Услуги" last="и стоимость." video />
-      <section ref={section} className="service-section grid" id="services">
+      <section className="services-editorial">
+        <div className="services-editorial__copy">
+          <span className="eyebrow">02 / Услуги</span>
+          <h1>Услуги<br />и приём</h1>
+          {!data.services.length && <p className="services-editorial__empty">Перечень услуг и цены<br />пока не опубликованы</p>}
+          {data.profile.address && <p className="pre-line services-editorial__location">{data.profile.address}</p>}
+          {contactMethods(data.profile).phone && <a className="services-editorial__phone" href={"tel:" + contactMethods(data.profile).phone}>{data.profile.phone}</a>}
+        </div>
+        <div className="services-editorial__media"><span className="eyebrow">В процессе работы</span><Video second /><p>Видео, предоставленное Анной</p></div>
+        <ContactChoiceDialog phone={data.profile.phone} triggerLabel="Обсудить приём" triggerClassName="services-editorial__contact" />
+      </section>
+      <section ref={section} className="service-section grid" id="services" hidden={!data.services.length}>
         <nav className="section-index">
           <a href="#services" className="small-link">
             Услуги и цены
@@ -646,11 +614,10 @@ function Services() {
               alt={data.services[active].title}
             />
           ) : (
-            <Video />
+            <Video second />
           )}
         </div>
       </section>
-      <FullMedia single />
       <Editorial />
       <PageLinks />
     </>
@@ -661,7 +628,7 @@ function About() {
   const p = data.profile;
   return (
     <>
-      <PageHero first="Анна" last="Мысливцева.">
+      <PageHero first="Анна" last="Мысливцева">
         {p.role}
       </PageHero>
       <section className="about-intro editorial grid">
@@ -707,7 +674,7 @@ function DiplomaGallery({ short = false }) {
         )}
       </div>
       {!data.diplomas.length ? (
-        <div className="documents-empty"><span className="eyebrow">Публикации</span><h3>Документы ещё<br />не опубликованы.</h3><p>Здесь появятся дипломы и сертификаты Анны после загрузки.</p><Link to="/about" className="small-link">Вернуться к знакомству</Link></div>
+        <div className="documents-empty"><span className="eyebrow">Публикации</span><h3>Документы ещё<br />не опубликованы</h3><p>Здесь появятся дипломы и сертификаты Анны после загрузки.</p><Link to="/about" className="small-link">Вернуться к знакомству</Link></div>
       ) : (
         <div className="diploma-grid">
           {(short ? data.diplomas.slice(0, 3) : data.diplomas).map((d) => (
@@ -805,7 +772,7 @@ function Listing({ type, id }) {
     </>
   ) : (
     <>
-      <PageHero first={title} last="Анны Мысливцевой." video />
+      <PageHero first={title} last="Анны Мысливцевой" video />
       <section className="listing-section">
         <div className="section-heading">
           <h2>{title}</h2>
@@ -855,39 +822,15 @@ function formatDate(s) {
 function Contact() {
   const { data } = useSite();
   const p = Object.fromEntries(Object.entries(data.profile).map(([key, value]) => [key, typeof value === "string" ? value.trim() : value]));
-  return (
-    <>
-      <ContactActions profile={p} />
-      <Booking profile={p} />
-      <section className="contact-section grid">
-        <h2>
-          Связаться
-          <br />с Анной.
-        </h2>
-        <div>
-          <Contacts profile={p} />
-          {p.hours && (
-            <>
-              <h3>Часы приёма</h3>
-              <p className="pre-line">{p.hours}</p>
-            </>
-          )}
-          {safePublicUrl(p.bookingUrl) ? (
-            <a
-              className="solid-link"
-              href={safePublicUrl(p.bookingUrl)}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Записаться на приём
-            </a>
-          ) : !contactMethods(p).phone && !p.email && !publicSocialLinks(p).length ? (
-            <Empty>Контакты для записи скоро появятся.</Empty>
-          ) : null}
-        </div>
-      </section>
-    </>
-  );
+  return <><ContactActions profile={p} /><CallbackForm profile={p} /></>;
+}
+function CallbackConsentPage() {
+  const { data } = useSite();
+  const doc = callbackDocument(data.profile);
+  return <section className="legal-page"><h1>Согласие на обработку телефона</h1>
+    {doc ? <><p>Версия: {doc.version}</p><h2>Оператор</h2><p>{doc.operatorName}</p><p className="pre-line">{doc.operatorDetails}</p><p className="pre-line">{doc.text}</p></> : <p>Проверенный документ пока не опубликован. Приём заявок на обратный звонок недоступен.</p>}
+    <Link to="/contact">К контактам</Link>
+  </section>;
 }
 function Legal({ type }) {
   const { data } = useSite();
@@ -908,7 +851,7 @@ function NotFound() {
   return (
     <section className="not-found">
       <span className="eyebrow">404</span>
-      <h1>Страница не найдена.</h1>
+      <h1>Страница не найдена</h1>
       <Link to="/" className="small-link">
         На главную
       </Link>
@@ -920,7 +863,7 @@ function Diplomas() {
   return <>
     <section className="documents-hero grid">
       <span className="eyebrow">Анна Мысливцева / Образование</span>
-      <h1>Образование<br /><span>и дипломы.</span></h1>
+      <h1>Образование<br /><span>и дипломы</span></h1>
       <Portrait loading="eager" />
       <div><p>{data.profile.qualification || "Дипломы, сертификаты и сведения об образовании специалиста."}</p><a href="#documents" className="text-action">К документам <span aria-hidden="true">↓</span></a></div>
     </section>
@@ -939,6 +882,7 @@ function Page() {
   if (["news", "offers"].includes(parts[0]))
     return <Listing type={parts[0]} id={parts[1]} />;
   if (parts[0] === "contact") return <Contact />;
+  if (parts[0] === "callback-consent") return <CallbackConsentPage />;
   if (["privacy", "terms"].includes(parts[0])) return <Legal type={parts[0]} />;
   return <NotFound />;
 }
@@ -1008,6 +952,7 @@ export default function App() {
     if (!motion || path.startsWith("/admin")) return;
     const l = new Lenis({ duration: 1.15, smoothWheel: true });
     lenis.current = l;
+    if (menu || isDocumentScrollLocked(document)) l.stop();
     l.on("scroll", ScrollTrigger.update);
     const tick = (t) => l.raf(t * 1000);
     gsap.ticker.add(tick);
@@ -1018,9 +963,14 @@ export default function App() {
     };
   }, [motion, path]);
   useEffect(() => {
-    if (menu) lenis.current?.stop();
-    else lenis.current?.start();
-  }, [menu]);
+    const sync = () => {
+      if (menu || isDocumentScrollLocked(document)) lenis.current?.stop();
+      else lenis.current?.start();
+    };
+    document.addEventListener("anna:dialog-scroll-lock", sync);
+    sync();
+    return () => document.removeEventListener("anna:dialog-scroll-lock", sync);
+  }, [menu, motion, path]);
   useLayoutEffect(() => {
     if (path.startsWith("/admin")) return;
     const ctx = gsap.context(() => {

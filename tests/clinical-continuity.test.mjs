@@ -234,3 +234,11 @@ test('legacy view explicitly distinguishes transformed normal exports from exact
   const source=await readFile(new URL('../src/ClinicalDemo.jsx',import.meta.url),'utf8');
   assert.match(source,/session.sourceIsLegacy/);assert.match(source,/не входят в обычные JSON, ZIP и PDF/);
 });
+
+test('pending navigation warning is scoped to saving with cleanup',async()=>{
+ const source=await readFile(new URL('../src/ClinicalDemo.jsx',import.meta.url),'utf8');
+ assert.match(source,/if \(!saving\) return;/);
+ assert.match(source,/addEventListener\('beforeunload', warn\)/);
+ assert.match(source,/return \(\) => window.removeEventListener\('beforeunload', warn\);\n  }, \[saving\]\)/);
+ assert.match(source,/Сохраняем… Не закрывайте страницу до подтверждения/);
+});

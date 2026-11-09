@@ -24,6 +24,12 @@ export default function ClinicalDemo() {
   const [state, setState] = useState(session.state), [selected, setSelected] = useState(() => session.state.clients[0]?.id ?? '');
   const [storageBlocked, setStorageBlocked] = useState(session.blocked), [saving, setSaving] = useState(false);
   useEffect(() => {
+    if (!saving) return;
+    const warn = event => { event.preventDefault(); event.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [saving]);
+  useEffect(() => {
     const changed = event => {
       if (event.storageArea === window.localStorage && (event.key === CLINICAL_KEY || event.key === null)) {
         session.invalidate(); setStorageBlocked(true);
@@ -189,7 +195,7 @@ export default function ClinicalDemo() {
       {!state.clients.length && <button className="clinical-secondary" disabled={busy} onClick={example}>Показать пример истории</button>}
     </div>
     {client && <div className="clinical-print-options"><label><input type="checkbox" checked={printNotes} onChange={e=>setPrintNotes(e.target.checked)}/> Заметки в PDF</label><label><input type="checkbox" checked={printPhotos} onChange={e=>setPrintPhotos(e.target.checked)}/> Фото в PDF</label><p>PDF создаётся через меню печати устройства. Архив ZIP не удаляет карту автоматически.</p></div>}
-    <p role="status" className="clinical-status">{photoBusy ? 'Сохраняем тестовое фото…' : message}</p>
+    <p role="status" className="clinical-status">{saving ? 'Сохраняем… Не закрывайте страницу до подтверждения.' : photoBusy ? 'Сохраняем тестовое фото…' : message}</p>
     <div className="clinical-grid">
       <aside className="clinical-people"><h2>Карты</h2>{state.clients.map(c=><button key={c.id} disabled={photoBusy || voiceBusy || importBusy || saving} className={selected===c.id?'active':''} onClick={()=>choose(c.id)}>{c.label}</button>)}{!state.clients.length && <p>Кабинет пуст. Создайте тестовую карту.</p>}</aside>
       <div className="clinical-main">{client ? <>

@@ -66,3 +66,44 @@ test('missing Web Locks disables modifications but valid state remains exportabl
  await expect(page.getByRole('button',{name:'Сохранить процедуру'})).toBeDisabled();
  expect(JSON.parse(await download(page,'Скачать все тестовые истории (JSON)'))).toEqual(s);
 });
+
+for (const reject of [false,true]) {
+ test(`pending save warns until ${reject ? 'failure' : 'verified commit'}`,async({page})=>{
+  const original=JSON.stringify(make(0));
+  await seed(page,original);
+  await page.addInitScript(()=>{
+   const original=navigator.locks.request.bind(navigator.locks);
+   navigator.locks.request=(...args)=>new Promise((resolve,reject)=>{
+    window.releaseSyntheticLock=()=>original(...args).then(resolve,reject);
+    window.rejectSyntheticLock=()=>reject(new Error('Synthetic lock failure'));
+   });
+  });
+  await page.goto('/demo/patients');
+  const unloadPrevented=()=>page.evaluate(()=>{
+   const event=new Event('beforeunload',{cancelable:true});
+   window.dispatchEvent(event);return event.defaultPrevented;
+  });
+  expect(await unloadPrevented()).toBe(false);
+  const field=page.getByRole('textbox',{name:'Заметка к посещению'});
+  await field.fill('Synthetic delayed write');
+  await page.getByRole('button',{name:'Сохранить процедуру'}).click();
+  await expect(page.getByRole('status')).toContainText('Сохраняем… Не закрывайте страницу до подтверждения.');
+  await expect(field).toHaveValue('Synthetic delayed write');
+  expect(await page.evaluate(key=>localStorage.getItem(key),KEY)).toBe(original);
+  await expect.poll(unloadPrevented).toBe(true);
+  await page.evaluate(reject=>reject?window.rejectSyntheticLock():window.releaseSyntheticLock(),reject);
+  if(reject) {
+   await expect(page.getByRole('status')).toContainText('Сохранение не подтверждено');
+   await expect(field).toHaveValue('Synthetic delayed write');
+   expect(await page.evaluate(key=>localStorage.getItem(key),KEY)).toBe(original);
+  } else {
+   await expect(page.getByRole('status')).toContainText('Сохранено в этом браузере.');
+   await expect(field).toHaveValue('');
+  }
+  await expect.poll(unloadPrevented).toBe(false);
+  if(!reject) {
+   await page.reload();
+   await expect(page.locator('.clinical-visit').first()).toContainText('Synthetic delayed write');
+  }
+ });
+}

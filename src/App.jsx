@@ -429,7 +429,7 @@ function PageLinks() {
       <div className="link-pictures">
         <Link to="/services">
           <img src="/media/session-neutral-01.jpg" alt="" loading="lazy" />
-          <span>Услуги и цены</span>
+          <span>{data.services.some(service => service.published && service.price.trim()) ? "Услуги и цены" : "Услуги"}</span>
         </Link>
         <Link to="/about">
           <Portrait loading="lazy" />

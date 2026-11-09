@@ -163,5 +163,14 @@ html { scroll-padding-top: calc(var(--header-height) + 24px); }
 
 /* Opaque backing preserves contrast over stock and custom portrait pixels. */
 .hero-scroll { background: #f4f0e7; color: #123f46; padding: 12px 16px; border: 1px solid #123f46; }
-/* Published location remains legible over any owner-selected portrait. */
-.hero-location { background: #f4f0e7; color: #123f46; width: fit-content; max-width: 100%; padding: 8px 12px; box-decoration-break: clone; }
+/* Keep full role and location in the stock portrait's clear left area. */
+.hero-location { background: none; padding: 0; }
+@media (min-width: 701px) {
+ .hero-role,.hero-location { max-width: 29vw; }
+ .hero-first:has(.hero-image--custom) .hero-shade {
+  background: linear-gradient(90deg, #f4f0e7 0%, #f4f0e7f5 30%, #f4f0e700 58%);
+ }
+}
+@media (max-width: 700px) {
+ .hero-role,.hero-location { width: 100%; max-width: none; }
+}

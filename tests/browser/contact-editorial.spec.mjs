@@ -1,6 +1,32 @@
 import { test, expect } from '@playwright/test';
 import { initialContent } from '../../shared/content.mjs';
 
+async function expectScrollReleased(page) {
+ await expect.poll(()=>page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
+ await expect.poll(()=>page.evaluate(()=>document.documentElement.style.overflow)).not.toBe('hidden');
+}
+
+// Warm native lazy images before capturing a full page. This never plays video.
+async function fullPageScreenshot(page, options) {
+ await page.evaluate(()=>document.fonts.ready);
+ try {
+  const height=await page.evaluate(()=>document.documentElement.scrollHeight);
+  const step=await page.evaluate(()=>Math.max(1,Math.floor(innerHeight*0.8)));
+  for(let y=0;y<height;y+=step) {
+   await page.evaluate(y=>window.scrollTo({top:y,behavior:'instant'}),y);
+   await page.waitForTimeout(80);
+  }
+  await expect.poll(()=>page.locator('img').evaluateAll(images=>images
+   .filter(img=>img.getClientRects().length>0)
+   .filter(img=>!img.complete || img.naturalWidth===0)
+   .map(img=>img.getAttribute('src'))),{timeout:15000,message:'Rendered images must load before visual capture'}).toEqual([]);
+ } finally {
+  await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+ }
+ await page.evaluate(()=>document.fonts.ready);
+ await page.screenshot({...options,fullPage:true});
+}
+
 // Prepared only. Requires separately authorized browser/socket runtime.
 // No test clicks tel/SMS/map links or submits callback intake.
 async function fixture(page) {
@@ -43,15 +69,16 @@ test('dialog locks focus and scroll, restores focus and offers only explicit dev
  }
  expect(await page.evaluate(()=>scrollY)).toBe(y);
  await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible(); await expect(trigger).toBeFocused();
- expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
+ await expectScrollReleased(page);
  await trigger.click();
  await expect(dialog).toBeVisible();
  await expect(dialog.getByRole('button',{name:'Закрыть выбор способа связи'})).toBeFocused();
  await page.keyboard.press('Escape');
  await expect(trigger).toBeFocused();
+ await expectScrollReleased(page);
  await expect(page.locator('.callback-section input')).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
- await page.screenshot({path:test.info().outputPath('contact-editorial.png'),fullPage:true});
+ await fullPageScreenshot(page,{path:test.info().outputPath('contact-editorial.png')});
 });
 test('home and services keep readable DOM, every route and safe unpublished office', async ({page}) => {
  await fixture(page);
@@ -66,7 +93,7 @@ test('home and services keep readable DOM, every route and safe unpublished offi
   await expect(page.locator('footer a[href="/diplomas"]')).toBeVisible();
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await expect(page.getByRole('link',{name:/Как добраться/})).toHaveCount(0);
-  await page.screenshot({path:test.info().outputPath((route.slice(1)||'home')+'.png'),fullPage:true});
+  await fullPageScreenshot(page,{path:test.info().outputPath((route.slice(1)||'home')+'.png')});
  }
 });
 test('unsupported native dialog uses real contact route without fake modality', async ({page})=>{
@@ -86,7 +113,7 @@ test('capture known public identity with full role and no invented services or p
   await page.evaluate(()=>document.fonts.ready);
   await expect(page.locator('input[type="tel"]')).toHaveCount(0);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
-  await page.screenshot({path:testInfo.outputPath('known-public-fixture-'+(route.slice(1)||'home')+'.png'),fullPage:true});
+  await fullPageScreenshot(page,{path:testInfo.outputPath('known-public-fixture-'+(route.slice(1)||'home')+'.png')});
  }
 });
 
@@ -109,6 +136,7 @@ for (const width of [701, 1023]) {
    await expect(page.getByRole('dialog',{name:'Связаться с Анной'})).toBeVisible();
    await page.keyboard.press('Escape');
    await expect(trigger).toBeFocused();
+   await expectScrollReleased(page);
    await page.screenshot({path:testInfo.outputPath(`header-${width}-${route.slice(1)||'home'}.png`)});
   }
  });
@@ -144,7 +172,7 @@ test.describe('smooth scrolling remains isolated from the native dialog', () => 
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
   await expect(page.locator('html')).not.toHaveClass(/lenis-stopped/);
-  expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
+  await expectScrollReleased(page);
  });
 });
 

@@ -112,3 +112,25 @@ test('portrait link contrast and footer role line boxes do not depend on photo o
  assert.match(css,/\.hero-scroll \{ background: #f4f0e7; color: #123f46;/);
  assert.match(css,/\.footer-tagline>span \{ display: block;[^}]*font: 20px\/1.6/);
 });
+
+test('PageLinks price label depends on a published price and retains its route', async () => {
+ const section=source.slice(source.indexOf('function PageLinks()'),source.indexOf('function Home()'));
+ const code=(await transform(section,{loader:'jsx'})).code;
+ const html=services=>{
+  const Component=new Function('React','useSite','Link','Portrait',code+';return PageLinks;')(
+   React,()=>({data:{profile:{},services}}),({to,children})=>React.createElement('a',{href:to},children),()=>null);
+  return renderToStaticMarkup(React.createElement(Component));
+ };
+ for(const services of [[],[{published:true,price:''}],[{published:false,price:'1000'}]]) {
+  assert.doesNotMatch(html(services),/Услуги и цены/);
+  assert.match(html(services),/href="\/services"/);
+ }
+ assert.match(html([{published:true,price:'1000'}]),/Услуги и цены/);
+});
+
+test('hero location has no card and long copy stays in the clear portrait area', async () => {
+ const css=await readFile(new URL('../src/editorial.css',import.meta.url),'utf8');
+ assert.match(css,/\.hero-location \{ background: none; padding: 0;/);
+ assert.match(css,/\.hero-role,\.hero-location \{ max-width: 29vw;/);
+ assert.match(css,/\.hero-first:has\(\.hero-image--custom\) \.hero-shade/);
+});

@@ -5,10 +5,12 @@ import "./admin.css";
 import { profileDraft, socialChannels } from "../shared/anna-materials.mjs";
 import { socialLink, updateSocialProfile } from "../shared/contact-links.mjs";
 import AdminCalendar from "./AdminCalendar.jsx";
+import AdminCallbacks from "./AdminCallbacks.jsx";
 import { mergeScheduleSave } from "./booking-client.mjs";
 const tabs = [
   ["profile", "О себе и сайт"],
   ["social", "Соцсети"],
+  ["callbacks", "Обратные звонки"],
   ["calendar", "Календарь и запись"],
   ["services", "Услуги и цены"],
   ["news", "Новости"],
@@ -156,7 +158,7 @@ export default function Admin() {
   const [calendarBusy, setCalendarBusy] = useState(false);
   const [contentOnlyAccess, setContentOnlyAccess] = useState(false);
   const [temporaryCalendarAccess, setTemporaryCalendarAccess] = useState(false);
-  const visibleTabs = contentOnlyAccess && !temporaryCalendarAccess ? tabs.filter(([key]) => key !== "calendar") : tabs;
+  const visibleTabs = tabs.filter(([key]) => !(contentOnlyAccess && key === "callbacks") && !(contentOnlyAccess && !temporaryCalendarAccess && key === "calendar"));
   const [auth, setAuth] = useState(null),
     [configured, setConfigured] = useState(true),
     [password, setPassword] = useState(""),
@@ -295,7 +297,7 @@ export default function Admin() {
       d.profile[key] = value;
     });
   const item =
-    payload && tab !== "profile" && tab !== "calendar" && tab !== "social"
+    payload && tab !== "profile" && tab !== "calendar" && tab !== "social" && tab !== "callbacks"
       ? payload.data[tab].find((x) => x.id === selected)
       : null;
   const changeItem = (key, value) =>
@@ -436,7 +438,7 @@ export default function Admin() {
               }}
             >
               {label}
-              {payload && key !== "profile" && key !== "calendar" && key !== "social" && (
+              {payload && key !== "profile" && key !== "calendar" && key !== "social" && key !== "callbacks" && (
                 <span>{payload.data[key].length}</span>
               )}
             </button>
@@ -514,13 +516,13 @@ export default function Admin() {
         <header className="admin-topbar">
           <div>
             <span className="eyebrow">
-              {tab === "calendar" ? "Подготовка расписания" : dirty
+              {tab === "callbacks" ? "Защищённые обращения" : tab === "calendar" ? "Подготовка расписания" : dirty
                 ? "Есть несохранённые изменения"
                 : "Все изменения сохранены"}
             </span>
             <h1>{tabs.find((t) => t[0] === tab)?.[1]}</h1>
           </div>
-          {tab !== "calendar" && <button
+          {tab !== "calendar" && tab !== "callbacks" && <button
             className="admin-primary"
             onClick={save}
             disabled={busy || sessionBusy || !dirty || !payload}
@@ -540,6 +542,8 @@ export default function Admin() {
         )}
         {!payload ? (
           <p>Загрузка…</p>
+        ) : tab === "callbacks" ? (
+          contentOnlyAccess ? <p>Обращения доступны только владельцу после входа по паролю.</p> : <AdminCallbacks onUnauthenticated={() => setAuth(false)} />
         ) : tab === "calendar" ? (
           <AdminCalendar key={temporaryCalendarAccess ? "temporary" : "owner"} temporaryCalendarAccess={temporaryCalendarAccess} services={payload.data.services} onDirtyChange={setCalendarDirty} onBusyChange={setCalendarBusy} onUnauthenticated={() => setAuth(false)} onSaved={(previousVersion, saved) => setPayload(current => mergeScheduleSave(current, previousVersion, saved))} />
         ) : tab === "social" ? (
@@ -587,7 +591,7 @@ export default function Admin() {
                   onChange={(v) => changeProfile("tagline", v)}
                 />
                 <div className="admin-field">
-                  <span>Главная фотография</span>
+                  <span>Основная фотография (существующая)</span>
                   <div className="portrait-preview">
                     <img
                       src={
@@ -601,6 +605,11 @@ export default function Admin() {
                     value={payload.data.profile.portrait}
                     onChange={(v) => changeProfile("portrait", v)}
                   />
+                </div>
+                <div className="admin-field">
+                  <span>Отдельный портрет первого экрана</span>
+                  <Upload value={payload.data.profile.heroPortrait ?? ""} onChange={v => changeProfile("heroPortrait", v)} />
+                  <p>Не меняет основную фотографию. Если поле пустое, сохраняется ранее загруженный собственный портрет; для исходного фото используется согласованная редакционная версия.</p>
                 </div>
                 <Field
                   label="Положение фото по вертикали, от 0 до 100"
@@ -647,15 +656,17 @@ export default function Admin() {
                 {[
                   ["phone", "Телефон"],
                   ["email", "Электронная почта"],
-                  ["address", "Адрес"],
+                  ["address", "Город и условия выезда (существующий текст)"],
+                  ["officeAddress", "Подтверждённый адрес кабинета"],
+                  ["directionsUrl", "HTTPS-ссылка на маршрут к кабинету"],
                   ["bookingUrl", "Ссылка на онлайн-запись"],
-                  ["mapUrl", "Ссылка на карту"],
+                  ["mapUrl", "Прежняя ссылка на карту (сохранена, не используется для кабинета)"],
                   ["socialUrl", "Социальная сеть"],
                 ].map(([k, label]) => (
                   <Field
                     key={k}
                     label={label}
-                    value={payload.data.profile[k]}
+                    value={payload.data.profile[k] ?? ""}
                     onChange={(v) => changeProfile(k, v)}
                     type={
                       k === "email"
@@ -677,6 +688,13 @@ export default function Admin() {
             </section>
             <section className="admin-card">
               <h2>Документы сайта</h2>
+              <h3>Согласие на обратный звонок</h3>
+              <p>Внесите проверенный документ и сведения оператора. Сохранение черновика не включает приём заявок. После изменения документов приём требует новой проверки и отдельного разрешения на сервере.</p>
+              <div className="admin-fields">
+                {[["version", "Версия документа"], ["operatorName", "Полное имя или название оператора"], ["operatorDetails", "Реквизиты и контакты оператора"], ["text", "Текст согласия на обработку телефона"]].map(([key,label]) => <Field key={key} label={label} textarea={["operatorDetails","text"].includes(key)} value={payload.data.profile.callbackConsent?.[key] ?? ""} onChange={value => change(d => { d.profile.callbackConsent = { published:false, version:"", operatorName:"", operatorDetails:"", text:"", ...d.profile.callbackConsent, [key]:value }; })} />)}
+                <label><input type="checkbox" checked={payload.data.profile.callbackConsent?.published ?? false} onChange={event => { const published=event.target.checked; change(d => { d.profile.callbackConsent = { version:"", operatorName:"", operatorDetails:"", text:"", ...d.profile.callbackConsent, published }; }); }} /> Опубликовать проверенный документ после сохранения</label>
+              </div>
+
               <div className="admin-fields">
                 <Field
                   label="Конфиденциальность"
@@ -911,9 +929,9 @@ export default function Admin() {
           </div>
         )}
         <div className="admin-footnote">
-          Изменения публикуются после сохранения. {contentOnlyAccess
+          {tab === "callbacks" ? "Обращения не публикуются на сайте. Доступ к ним есть только у владельца." : <>Изменения публикуются после сохранения. {contentOnlyAccess
             ? "Пока доступ открыт, черновики в панели доступны всем посетителям."
-            : "Черновики видны только в этой панели."}
+            : "Черновики видны только в этой панели."}</>}
         </div>
       </main>
     </div>

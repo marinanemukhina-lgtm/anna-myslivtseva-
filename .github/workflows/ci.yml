@@ -23,7 +23,10 @@ jobs:
       - run: npm run build:booking-demo
       - run: npx playwright install --with-deps chromium webkit
         timeout-minutes: 5
+      - name: Capture editorial routes at desktop, tablet, mobile and landscape sizes
+        run: npm run test:editorial:browser
       - run: npm run test:browser
+      - run: npm run test:contact:browser
       - run: npm run test:booking-demo:browser
       - uses: actions/upload-artifact@v4
         if: always()
@@ -50,6 +53,10 @@ jobs:
         env:
           BOOKING_SYSTEM_CHROME: '1'
         run: npx playwright test --project=chromium-desktop --project=chromium-mobile
+      - name: Check callback flow with official Chrome
+        env:
+          BOOKING_SYSTEM_CHROME: '1'
+        run: npx playwright test --config playwright.contact.config.mjs --project=contact-chromium-desktop --project=contact-chromium-small
       - uses: actions/upload-artifact@v4
         if: always()
         with:

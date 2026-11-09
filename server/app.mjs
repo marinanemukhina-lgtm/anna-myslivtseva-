@@ -1,5 +1,7 @@
 import express from "express";
+import { allowsInitialContentFallback, storageConfigurationReady } from "./storage-config.mjs";
 import { registerMarketing } from "./marketing.mjs";
+import { registerCallbackBodyLimit, registerCallbacks } from "./callbacks.mjs";
 import { registerPrivateBooking } from "./booking-occupancy.mjs";
 import { registerPublicPages } from "./public-pages.mjs";
 import { temporaryContentAccess, temporaryCalendarAccess, contentPayload } from "./temporary-content-access.mjs";
@@ -104,6 +106,7 @@ export function createApp() {
     next();
   });
   closePublicIntake(app);
+  registerCallbackBodyLimit(app);
   // 3 MiB of file bytes expands to 4 MiB in base64, plus the JSON envelope.
   app.use(express.json({ limit: 4 * 1024 * 1024 + 16 * 1024 }));
   app.use("/api", (req, res, next) => {
@@ -130,7 +133,7 @@ export function createApp() {
   });
   app.get("/api/content", async (req, res, next) => {
     try {
-      if (process.env.VERCEL && !process.env.DATABASE_URL)
+      if (allowsInitialContentFallback(process.env))
         return res.json(publicContent(initialContent));
       res.json(publicContent((await readContent()).data));
     } catch (e) {
@@ -145,7 +148,7 @@ export function createApp() {
         temporaryCalendarAccess: temporaryCalendarAccess(req),
         configured:
           !!process.env.ADMIN_PASSWORD_HASH &&
-          (!process.env.VERCEL || !!process.env.DATABASE_URL),
+          storageConfigurationReady(process.env),
       });
     } catch (e) {
       if (e.message === "STORAGE_NOT_CONFIGURED")
@@ -319,7 +322,7 @@ export function createApp() {
       const url = "/api/media/" + req.params.id;
       const data = publicContent((await readContent()).data);
       const used =
-        data.profile.portrait === url ||
+        (data.profile.portrait === url || data.profile.heroPortrait === url) ||
         ["services", "news", "offers", "diplomas"].some((k) =>
           data[k].some((x) => x.image === url),
         );
@@ -340,6 +343,7 @@ export function createApp() {
   });
   registerBookingPreparation(app, requireAdmin, requireCalendarAccess);
   registerMarketing(app, requireAdmin, requireContentAccess);
+  registerCallbacks(app, requireAdmin);
   registerPrivateBooking(app, requireAdmin);
   registerPublicPages(app);
   app.use("/api", (_req, res) =>

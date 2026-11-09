@@ -159,3 +159,12 @@ test("callback modal is gated, single-form, uniquely labelled and busy-close pro
  assert.match(source,/setConsent\(false\); setCloseNotice\(false\)/);
  assert.match(source,/unlock.current\?\.\(\)/);
 });
+
+test("callback close restores current remounted trigger after consent refresh",async()=>{
+ const source=await readFile(new URL('../src/CallbackForm.jsx',import.meta.url),'utf8');
+ assert.match(source,/ref=\{triggerRef\}[^>]*onClick=\{goToForm\}/);
+ const close=source.slice(source.indexOf('function releaseDialog()'),source.indexOf('function closeDialog()'));
+ assert.ok(close.indexOf('if(saved)')<close.indexOf('triggerRef.current?.isConnected'));
+ assert.ok(close.indexOf('triggerRef.current?.isConnected')<close.indexOf('opener.current?.isConnected'));
+ assert.match(close,/else heading.current\?\.focus/);
+});

@@ -33,6 +33,7 @@ export default function CallbackForm({ profile = {} }) {
   const uid = useId();
   const titleId = uid + '-title', phoneId = uid + '-phone', hintId = uid + '-hint';
   const dialog = useRef(null), opener = useRef(null), unlock = useRef(null), dialogHeading = useRef(null);
+  const triggerRef = useRef(null);
   const backdropPress = useRef(false);
   const outside = event => { const r=event.currentTarget.getBoundingClientRect(); return event.clientX<r.left || event.clientX>r.right || event.clientY<r.top || event.clientY>r.bottom; };
   const [nativeDialog, setNativeDialog] = useState(false);
@@ -45,6 +46,7 @@ export default function CallbackForm({ profile = {} }) {
   function releaseDialog() {
     unlock.current?.(); unlock.current = null; setModalOpen(false); setConsent(false); setCloseNotice(false);
     if(saved) requestAnimationFrame(() => heading.current?.focus({preventScroll:true}));
+    else if(triggerRef.current?.isConnected) triggerRef.current.focus({preventScroll:true});
     else if(opener.current?.isConnected) opener.current.focus({preventScroll:true});
     else heading.current?.focus({preventScroll:true});
   }
@@ -131,7 +133,7 @@ export default function CallbackForm({ profile = {} }) {
         <span className="eyebrow">Обратный звонок</span>
         <h2 id={titleId} ref={heading} tabIndex={-1}>{saved && !modalOpen ? "Заявка сохранена" : "Удобнее, чтобы вам позвонили?"}</h2>
         <p>{saved ? "Номер появился в защищённом списке обращений Анны. Это просьба перезвонить, а не подтверждённая запись на приём." : config?.enabled ? "Оставьте только номер телефона. Медицинские сведения здесь не нужны." : (phone ? "Обратный звонок пока недоступен. Можно связаться с Анной напрямую." : "Обратный звонок пока недоступен.")}</p>
-        {config?.enabled && !saved && <button className="contact-button" type="button" onClick={goToForm}>Оставить номер для звонка<span aria-hidden="true">↓</span></button>}
+        {config?.enabled && !saved && <button ref={triggerRef} className="contact-button" type="button" onClick={goToForm}>Оставить номер для звонка<span aria-hidden="true">↓</span></button>}
       </div>
       <Container ref={dialog} className={useModal ? 'callback-dialog' : undefined}
         aria-labelledby={useModal ? uid + '-dialog-title' : undefined}

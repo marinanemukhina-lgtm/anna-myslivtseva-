@@ -1,5 +1,7 @@
 name: Synthetic native PostgreSQL 18 TLS checks
 on:
+  push:
+    branches: ["prep/anna-complete-contact-20261108"]
   pull_request:
     paths:
       - '.github/workflows/native-postgres18.yml'

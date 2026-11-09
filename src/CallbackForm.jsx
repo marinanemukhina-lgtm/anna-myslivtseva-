@@ -93,7 +93,7 @@ export default function CallbackForm({ profile = {} }) {
       <div>
         <span className="eyebrow">Обратный звонок</span>
         <h2 id="callback-title" ref={heading} tabIndex={-1}>{saved ? "Заявка сохранена" : "Удобнее, чтобы вам позвонили?"}</h2>
-        <p>{saved ? "Номер появился в защищённом списке обращений Анны. Это просьба перезвонить, а не подтверждённая запись на приём." : config?.enabled ? "Оставьте только номер телефона. Медицинские сведения здесь не нужны." : "Обратный звонок пока недоступен. Можно связаться с Анной напрямую."}</p>
+        <p>{saved ? "Номер появился в защищённом списке обращений Анны. Это просьба перезвонить, а не подтверждённая запись на приём." : config?.enabled ? "Оставьте только номер телефона. Медицинские сведения здесь не нужны." : (phone ? "Обратный звонок пока недоступен. Можно связаться с Анной напрямую." : "Обратный звонок пока недоступен.")}</p>
         {config?.enabled && !saved && <button className="contact-button" type="button" onClick={goToForm}>Оставить номер для звонка<span aria-hidden="true">↓</span></button>}
       </div>
       <div>
@@ -111,7 +111,7 @@ export default function CallbackForm({ profile = {} }) {
           <p className="contact-note">Подтверждение появится только после сохранения на сервере. Заявка не подписывает вас на рекламу.</p>
         </form>
         : <div className="callback-unavailable" role="status">
-          <p>{configError ? "Не удалось проверить доступность обратного звонка." : config ? "Обратный звонок пока не подключён. Воспользуйтесь прямой связью с Анной." : "Проверяем доступность обратного звонка…"}</p>
+          <p>{configError ? "Не удалось проверить доступность обратного звонка." : config ? (phone ? "Обратный звонок пока не подключён. Воспользуйтесь прямой связью с Анной." : "Обратный звонок пока не подключён.") : "Проверяем доступность обратного звонка…"}</p>
           {configError && <button type="button" className="contact-button" onClick={() => setRetryConfig(value => value + 1)}>Повторить проверку</button>}
           {phone && <a className="contact-button" href={"tel:" + phone}>Позвонить {displayPhone}</a>}
         </div>}

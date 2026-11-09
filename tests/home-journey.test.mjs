@@ -96,3 +96,19 @@ test('direct header contact shares the hidden-navigation tablet breakpoint', asy
   const css = await readFile(new URL('../src/editorial.css', import.meta.url), 'utf8');
   assert.match(css, /@media \(max-width: 1023px\) \{\s*\.site-header \.header-contact \{ display: inline-block;/);
 });
+
+test('menu has an explicit accessible name independent of decorative CSS', () => {
+  assert.match(source, /className="small-link menu-trigger"\s+aria-label="Меню"/);
+});
+
+test('hero chapter price label requires a published price', () => {
+ assert.doesNotMatch(render('', []), /Услуги и цены/);
+ assert.doesNotMatch(render('', [{published:true,price:''}]), /Услуги и цены/);
+ assert.doesNotMatch(render('', [{published:false,price:'1000'}]), /Услуги и цены/);
+ assert.match(render('', [{published:true,price:'1000'}]), /Услуги и цены/);
+});
+test('portrait link contrast and footer role line boxes do not depend on photo or name size', async () => {
+ const css=await readFile(new URL('../src/editorial.css',import.meta.url),'utf8');
+ assert.match(css,/\.hero-scroll \{ background: #f4f0e7; color: #123f46;/);
+ assert.match(css,/\.footer-tagline>span \{ display: block;[^}]*font: 20px\/1.6/);
+});

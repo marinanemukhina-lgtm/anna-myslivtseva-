@@ -34,13 +34,13 @@
 .services-editorial__media { border-left: 1px solid #f3eee740; padding-left: 5vw; }
 .services-editorial__media video { display: block; position: static; width: 100%; height: auto; aspect-ratio: 9/16; object-fit: cover; margin-top: 34px; }
 .services-editorial__media p { font-size: 12px; margin-top: 18px; }
-.services-editorial .services-editorial__contact { position: absolute; left: calc(60% - 90px); bottom: 30px; display: grid; place-content: center; width: 190px; height: 190px; padding: 30px; border: 1px solid var(--paper); border-radius: 50%; font-size: 20px; text-align: center; background: var(--ink); color: var(--paper); }
+.services-editorial .services-editorial__contact { position: static; grid-column: 1 / -1; justify-self: center; margin-top: 36px; display: grid; place-content: center; width: 190px; height: 190px; padding: 30px; border: 1px solid var(--paper); border-radius: 50%; font-size: 20px; text-align: center; background: var(--ink); color: var(--paper); }
 .services-editorial__contact::after { content: "↗"; font-size: 30px; margin-top: 12px; }
 .services-editorial .contact-choice-trigger:focus-visible { outline-color: var(--paper); }
 .service-section[hidden] { display: none; }
 .footer { background: var(--paper); color: var(--ink); padding: 60px var(--gutter) 32px; margin-top: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 40px 6vw; }
 .footer-tagline { margin: 0; font-size: clamp(42px,5vw,78px); }
-.footer-tagline>span { font: 20px/1.6 var(--sans); text-transform: none; letter-spacing: 0; }
+.footer-tagline>span { display: block; margin-top: 12px; font: 20px/1.6 var(--sans); text-transform: none; letter-spacing: 0; }
 .footer-grid { display: block; margin: 0; }
 .footer .contacts { display: grid; gap: 28px; font-size: 18px; }
 .footer .contacts > div > span { font-size: 11px; }
@@ -160,3 +160,8 @@ html { scroll-padding-top: calc(var(--header-height) + 24px); }
 .contacts > div > p + p { margin-top: 12px; }
 .footer .contacts > div { margin-bottom: 0; }
 .contact-editorial__booking { display: inline-flex; gap: 20px; min-height: 44px; align-items: center; border-bottom: 1px solid currentColor; }
+
+/* Opaque backing preserves contrast over stock and custom portrait pixels. */
+.hero-scroll { background: #f4f0e7; color: #123f46; padding: 12px 16px; border: 1px solid #123f46; }
+/* Published location remains legible over any owner-selected portrait. */
+.hero-location { background: #f4f0e7; color: #123f46; width: fit-content; max-width: 100%; padding: 8px 12px; box-decoration-break: clone; }

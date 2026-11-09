@@ -209,6 +209,7 @@ function Header({ isHome }) {
         </nav>
         <button
           className="small-link menu-trigger"
+          aria-label="Меню"
           onClick={() => setMenu(true)}
           aria-expanded={menu}
         >
@@ -315,7 +316,7 @@ function Hero() {
         </div>
       </div>
       <nav className="hero-chapters" aria-label="Навигация первого экрана">
-        <Link to="/services"><span>01</span> Услуги и цены</Link>
+        <Link to="/services"><span>01</span> {services.some(service => service.price.trim()) ? "Услуги и цены" : "Услуги"}</Link>
         <Link to="/about"><span>02</span> Об Анне</Link>
         <Link to="/diplomas"><span>03</span> Дипломы</Link>
         <Link to="/contact"><span>04</span> Запись на приём</Link>
@@ -388,7 +389,7 @@ function Editorial({ kind = "philosophy" }) {
         <h3 className="reveal">
           {copy || (
             <>
-              {kind === "philosophy" ? "Прежде чем записаться — познакомьтесь со специалистом и его образованием." : "Информация об услугах, стоимости и записи. В одном месте, в вашем ритме."}
+              {kind === "philosophy" ? "Прежде чем записаться — познакомьтесь со специалистом и его образованием" : "Информация об услугах, стоимости и записи. В одном месте, в вашем ритме"}
             </>
           )}
         </h3>

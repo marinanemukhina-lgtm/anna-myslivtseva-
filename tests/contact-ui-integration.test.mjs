@@ -113,3 +113,27 @@ test("all public route offsets use measured header height, and the short home ha
  assert.doesNotMatch(app,/href="#introduction"/);
  assert.match(app,/<Link to="\/about" className="hero-scroll">/);
 });
+
+test("disabled callback suggests direct contact only with a valid published phone", () => {
+ const { default: CallbackForm } = loadComponent("CallbackForm.jsx");
+ for (const phone of ["", "not-a-number"]) {
+  const html = render(CallbackForm,{profile:{phone}});
+  assert.match(html,/Обратный звонок пока недоступен/);
+  assert.doesNotMatch(html,/Можно связаться с Анной напрямую|Воспользуйтесь прямой связью|href="tel:|<input|<form/);
+ }
+ const html = render(CallbackForm,{profile:{phone:"+79000000000"}});
+ assert.match(html,/Можно связаться с Анной напрямую/);
+ assert.match(html,/href="tel:\+79000000000"/);
+});
+
+test("dialog keyboard wraps both boundaries without intercepting Escape", async () => {
+ const { cycleDialogFocus } = await import("../src/dialog-focus.mjs");
+ let focused, prevented=0;
+ const item=()=>({tabIndex:0,getClientRects:()=>[{}],focus(){focused=this;}});
+ const first=item(), last=item(), disabled={...item(),disabled:true};
+ const dialog={querySelectorAll:()=>[first,disabled,last],ownerDocument:{activeElement:last}};
+ const event={key:'Tab',currentTarget:dialog,preventDefault(){prevented++;}};
+ cycleDialogFocus(event); assert.equal(focused,first);
+ dialog.ownerDocument.activeElement=first; cycleDialogFocus({...event,shiftKey:true}); assert.equal(focused,last);
+ cycleDialogFocus({...event,key:'Escape'}); assert.equal(prevented,2);
+});

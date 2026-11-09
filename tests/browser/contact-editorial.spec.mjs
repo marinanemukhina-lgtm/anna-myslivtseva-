@@ -12,7 +12,7 @@ async function fixture(page) {
  await page.route('**/api/content', route => route.fulfill({json:data}));
  await page.route('**/api/contact/config', route => route.fulfill({json:{enabled:false}}));
 }
-test('dialog locks focus and scroll, restores focus and offers only explicit device links', async ({page}) => {
+test('dialog locks focus and scroll, restores focus and offers only explicit device links', async ({page, browserName, isMobile}, testInfo) => {
  await fixture(page); await page.goto('/contact');
  const circle = page.locator('.phone-circle-link');
  await expect(circle).toHaveAttribute('href','tel:+79000000000');
@@ -23,6 +23,10 @@ test('dialog locks focus and scroll, restores focus and offers only explicit dev
  const dialog = page.getByRole('dialog',{name:'Связаться с Анной'});
  await expect(dialog).toBeVisible();
  await expect(dialog.getByRole('button',{name:'Закрыть выбор способа связи'})).toBeFocused();
+ await page.keyboard.press('Shift+Tab');
+ await expect(dialog.getByRole('link',{name:'Написать SMS Анне'})).toBeFocused();
+ await page.keyboard.press('Tab');
+ await expect(dialog.getByRole('button',{name:'Закрыть выбор способа связи'})).toBeFocused();
  for(let i=0;i<6;i++) {
   await page.keyboard.press('Tab');
   expect(await dialog.evaluate(el=>el.contains(document.activeElement))).toBe(true);
@@ -30,11 +34,21 @@ test('dialog locks focus and scroll, restores focus and offers only explicit dev
  await expect(dialog.getByRole('link',{name:'Позвонить Анне'})).toHaveAttribute('href','tel:+79000000000');
  await expect(dialog.getByRole('link',{name:'Написать SMS Анне'})).toHaveAttribute('href','sms:+79000000000');
  const y = await page.evaluate(()=>scrollY);
- await page.mouse.wheel(0,400);
- await page.waitForTimeout(200);
+ if (browserName === 'webkit' && isMobile) {
+  testInfo.annotations.push({type:'coverage',description:'Mobile WebKit: lock state checked; physical swipe is not covered.'});
+  expect(await page.evaluate(()=>document.body.style.overflow)).toBe('hidden');
+ } else {
+  await page.mouse.wheel(0,400);
+  await page.waitForTimeout(200);
+ }
  expect(await page.evaluate(()=>scrollY)).toBe(y);
  await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible(); await expect(trigger).toBeFocused();
  expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
+ await trigger.click();
+ await expect(dialog).toBeVisible();
+ await expect(dialog.getByRole('button',{name:'Закрыть выбор способа связи'})).toBeFocused();
+ await page.keyboard.press('Escape');
+ await expect(trigger).toBeFocused();
  await expect(page.locator('.callback-section input')).toHaveCount(0);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
  await page.screenshot({path:test.info().outputPath('contact-editorial.png'),fullPage:true});
@@ -102,7 +116,7 @@ for (const width of [701, 1023]) {
 
 test.describe('smooth scrolling remains isolated from the native dialog', () => {
  test.use({reducedMotion:'no-preference',viewport:{width:844,height:390}});
- test('Lenis stops background scrolling but permits overflow inside the chooser', async ({page},testInfo) => {
+ test('Lenis stops background scrolling but permits overflow inside the chooser', async ({page,browserName,isMobile},testInfo) => {
   await fixture(page); await page.goto('/contact');
   await expect(page.locator('html')).toHaveClass(/lenis/);
   const trigger=page.locator('.site-header .header-contact');
@@ -114,9 +128,16 @@ test.describe('smooth scrolling remains isolated from the native dialog', () => 
   // Ensure overflow independently of the platform's font metrics.
   await dialog.evaluate(el=>{el.style.maxHeight='220px';el.scrollTop=0;});
   const y=await page.evaluate(()=>scrollY);
-  const box=await dialog.boundingBox();
-  await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
-  await page.mouse.wheel(0,200);
+  if (browserName === 'webkit' && isMobile) {
+   testInfo.annotations.push({type:'coverage',description:'Programmatic inner scroll and lock state only; no physical touch/swipe coverage.'});
+   expect(await page.evaluate(()=>document.body.style.overflow)).toBe('hidden');
+   expect(await dialog.evaluate(el=>el.scrollHeight>el.clientHeight)).toBe(true);
+   await dialog.evaluate(el=>{el.scrollTop=100;});
+  } else {
+   const box=await dialog.boundingBox();
+   await page.mouse.move(box.x+box.width/2,box.y+box.height/2);
+   await page.mouse.wheel(0,200);
+  }
   await expect.poll(()=>dialog.evaluate(el=>el.scrollTop)).toBeGreaterThan(0);
   expect(await page.evaluate(()=>scrollY)).toBe(y);
   await page.screenshot({path:testInfo.outputPath('dialog-native-overflow-lenis.png')});
@@ -125,4 +146,14 @@ test.describe('smooth scrolling remains isolated from the native dialog', () => 
   await expect(page.locator('html')).not.toHaveClass(/lenis-stopped/);
   expect(await page.evaluate(()=>document.body.style.overflow)).not.toBe('hidden');
  });
+});
+
+test('services contact action never overlaps the full video caption', async ({page}) => {
+ await fixture(page); await page.goto('/services');
+ const caption=page.locator('.services-editorial__media p');
+ const action=page.locator('.services-editorial__contact');
+ await expect(caption).toBeVisible(); await expect(action).toBeVisible();
+ const a=await action.boundingBox(), c=await caption.boundingBox();
+ expect(a.y).toBeGreaterThanOrEqual(c.y+c.height);
+ expect(await page.locator('.services-editorial__media').evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
 });

@@ -1,3 +1,4 @@
+import { parseClinicalJSON } from '../shared/clinical-json.mjs';
 // Portable ZIP (stored entries) for the synthetic, browser-local clinical demo.
 // No remote transmission or real patient storage.
 const enc=new TextEncoder(),dec=new TextDecoder('utf-8',{fatal:true});
@@ -93,13 +94,14 @@ export function exportClinicalHistory(state,clientId){
 export function importClinicalHistory(buffer){
  const entries=readZip(buffer),manifestBytes=entries.get('manifest.json');
  if(manifestBytes.length>2000000)throw Error('INVALID_MANIFEST');
- const m=JSON.parse(dec.decode(manifestBytes));
- if(m?.format!=='anna-synthetic-history-v1'||!Array.isArray(m.visits)||!Array.isArray(m.photos)||!m.client||!m.schema)throw Error('INVALID_MANIFEST');
- if(entries.size!==m.photos.length+1)throw Error('UNEXPECTED_ARCHIVE_ENTRY');
+ const m=parseClinicalJSON(dec.decode(manifestBytes));
+ if(!m || Object.keys(m).sort().join(',')!=='client,format,photos,schema,visits' || m?.format!=='anna-synthetic-history-v1'||!Array.isArray(m.visits)||!Array.isArray(m.photos)||!m.client||!m.schema)throw Error('INVALID_MANIFEST');
+ if(m.schema!=='anna-open-synthetic-clinical-v2')throw Error('UNSUPPORTED_ARCHIVE_SCHEMA');
+ if(entries.size!==m.photos.length+1 || new Set(m.photos.map(p=>p?.name)).size!==m.photos.length)throw Error('UNEXPECTED_ARCHIVE_ENTRY');
  const photos=m.photos.map(p=>{
-  if(typeof p.name!=='string'||!entries.has(p.name))throw Error('INVALID_MANIFEST');
+  if(!p || Object.keys(p).some(k=>!['id','visitId','angle','name'].includes(k)) || typeof p.name!=='string'||!entries.has(p.name))throw Error('INVALID_MANIFEST');
   const ext=p.name.split('.').at(-1),mime=MIMES[ext];if(!mime)throw Error('INVALID_MANIFEST');
-  return{...(p.id?{id:p.id}:{}),visitId:p.visitId,angle:p.angle,data:'data:'+mime+';base64,'+b64(entries.get(p.name))};
+  return{...(Object.hasOwn(p,'id')?{id:p.id}:{}),visitId:p.visitId,angle:p.angle,data:'data:'+mime+';base64,'+b64(entries.get(p.name))};
  });
  return{schema:m.schema,clients:[m.client],visits:m.visits,photos};
 }

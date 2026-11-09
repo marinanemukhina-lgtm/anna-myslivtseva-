@@ -23,6 +23,8 @@ jobs:
       - run: npm run build:booking-demo
       - run: npx playwright install --with-deps chromium webkit
         timeout-minutes: 5
+      - name: Verify synthetic clinical storage continuity
+        run: npm run test:clinical:browser
       - name: Capture editorial routes at desktop, tablet, mobile and landscape sizes
         run: npm run test:editorial:browser
       - run: npm run test:browser

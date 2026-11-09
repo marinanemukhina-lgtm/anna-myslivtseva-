@@ -102,8 +102,18 @@ for (const reject of [false,true]) {
   }
   await expect.poll(unloadPrevented).toBe(false);
   if(!reject) {
+   const committed=await page.evaluate(key=>localStorage.getItem(key),KEY);
+   const state=JSON.parse(committed), initial=JSON.parse(original);
+   expect(state.clients).toEqual(initial.clients);
+   expect(state.visits).toHaveLength(2);
+   expect(state.visits[0]).toEqual(initial.visits[0]);
+   expect(state.visits[1].date).toBe('2026-11-06');
+   expect(state.visits.map(visit=>visit.note)).toEqual([initial.visits[0].note,'Synthetic delayed write']);
    await page.reload();
-   await expect(page.locator('.clinical-visit').first()).toContainText('Synthetic delayed write');
+   expect(await page.evaluate(key=>localStorage.getItem(key),KEY)).toBe(committed);
+   await expect(page.locator('.clinical-visit')).toHaveCount(2);
+   await expect(page.locator('.clinical-visit').filter({hasText:'Synthetic delayed write'})).toHaveCount(1);
+   await expect(page.locator('.clinical-visit').filter({hasText:initial.visits[0].note})).toHaveCount(1);
   }
  });
 }

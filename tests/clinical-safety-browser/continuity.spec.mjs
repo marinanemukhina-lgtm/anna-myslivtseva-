@@ -85,6 +85,7 @@ for (const reject of [false,true]) {
   });
   expect(await unloadPrevented()).toBe(false);
   const field=page.getByRole('textbox',{name:'Заметка к посещению'});
+  await page.getByLabel('Дата',{exact:true}).fill('2026-11-06');
   await field.fill('Synthetic delayed write');
   await page.getByRole('button',{name:'Сохранить процедуру'}).click();
   await expect(page.getByRole('status')).toContainText('Сохраняем… Не закрывайте страницу до подтверждения.');
@@ -115,5 +116,46 @@ for (const reject of [false,true]) {
    await expect(page.locator('.clinical-visit').filter({hasText:'Synthetic delayed write'})).toHaveCount(1);
    await expect(page.locator('.clinical-visit').filter({hasText:initial.visits[0].note})).toHaveCount(1);
   }
+ });
+}
+
+for(const [timezoneId,instant,expected] of [['Pacific/Kiritimati','2027-01-01T12:30:00Z','2027-01-02'],['Pacific/Honolulu','2027-01-01T00:30:00Z','2026-12-31']]) {
+ test.describe(`device calendar ${timezoneId}`,()=>{
+  test.use({timezoneId});
+  test('new visit starts on local today and preserves a user-selected date',async({page})=>{
+   const original=make(0);
+   await seed(page,JSON.stringify(original));
+   await page.clock.setFixedTime(new Date(instant));
+   await page.goto('/demo/patients');
+   const date=page.getByLabel('Дата',{exact:true});
+   await expect(date).toHaveValue(expected);
+   const note=page.getByRole('textbox',{name:'Заметка к посещению'});
+   await note.fill('Synthetic default local date');
+   await page.getByRole('button',{name:'Сохранить процедуру'}).click();
+   await expect(page.getByRole('status')).toContainText('Сохранено в этом браузере.');
+   await expect(note).toHaveValue('');
+   let saved=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),KEY);
+   expect(saved.visits).toHaveLength(2);
+   expect(saved.visits[0]).toEqual(original.visits[0]);
+   expect(saved.visits[1].date).toBe(expected);
+   expect(saved.visits[1].note).toBe('Synthetic default local date');
+   await date.fill('2027-02-10');
+   await note.fill('Synthetic selected date');
+   await page.getByRole('button',{name:'Сохранить процедуру'}).click();
+   await expect(page.getByRole('status')).toContainText('Сохранено в этом браузере.');
+   await expect(note).toHaveValue('');
+   await expect(date).toHaveValue('2027-02-10');
+   const raw=await page.evaluate(key=>localStorage.getItem(key),KEY);
+   saved=JSON.parse(raw);
+   expect(saved.visits[0]).toEqual(original.visits[0]);
+   expect(saved.visits).toHaveLength(3);
+   expect(saved.visits.slice(1).map(v=>({date:v.date,note:v.note}))).toEqual([
+    {date:expected,note:'Synthetic default local date'},
+    {date:'2027-02-10',note:'Synthetic selected date'},
+   ]);
+   await page.reload();
+   expect(await page.evaluate(key=>localStorage.getItem(key),KEY)).toBe(raw);
+   await expect(date).toHaveValue(expected);
+  });
  });
 }

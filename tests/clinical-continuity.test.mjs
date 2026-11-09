@@ -242,3 +242,20 @@ test('pending navigation warning is scoped to saving with cleanup',async()=>{
  assert.match(source,/return \(\) => window.removeEventListener\('beforeunload', warn\);\n  }, \[saving\]\)/);
  assert.match(source,/Сохраняем… Не закрывайте страницу до подтверждения/);
 });
+
+test('new-visit calendar uses device timezone rather than UTC across year boundaries',async()=>{
+ const {localCalendarDate}=await import('../src/local-calendar-date.mjs');
+ assert.equal(localCalendarDate(new Date(2027,5,9,12)), '2027-06-09');
+ const {execFileSync}=await import('node:child_process');
+ const moduleURL=new URL('../src/local-calendar-date.mjs',import.meta.url).href;
+ for(const [TZ,instant,expected] of [
+  ['Pacific/Kiritimati','2027-01-01T12:30:00Z','2027-01-02'],
+  ['Pacific/Honolulu','2027-01-01T00:30:00Z','2026-12-31'],
+ ]) {
+  const script=`import {localCalendarDate} from ${JSON.stringify(moduleURL)};process.stdout.write(localCalendarDate(new Date(${JSON.stringify(instant)})));`;
+  assert.equal(execFileSync(process.execPath,['--input-type=module','-e',script],{env:{...process.env,TZ},encoding:'utf8'}),expected);
+ }
+ const source=await readFile(new URL('../src/ClinicalDemo.jsx',import.meta.url),'utf8');
+ assert.match(source,/useState\(\(\) => localCalendarDate\(\)\)/);
+ assert.doesNotMatch(source,/useState\('2026-11-06'\)/);
+});

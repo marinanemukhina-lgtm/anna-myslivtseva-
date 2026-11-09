@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { PERSONAS, PROCEDURES, ANGLES, restoreClinicalDemo, emptyClinicalDemo, exampleClinicalDemo, addDemoClient, addDemoVisit, setDemoPhoto, addDemoPhoto, updateDemoPhoto, deleteDemoPhoto, deleteDemoClient } from '../shared/clinical-demo.mjs';
 import './clinical-demo.css';
+import { localCalendarDate } from './local-calendar-date.mjs';
 import VoiceNote from './VoiceNote.jsx';
 import { encodeClinicalPhoto } from './clinical-photo.mjs';
 import ClinicalGallery from './ClinicalGallery.jsx';
@@ -38,7 +39,7 @@ export default function ClinicalDemo() {
     window.addEventListener('storage', changed);
     return () => window.removeEventListener('storage', changed);
   }, [session]);
-  const [day, setDay] = useState('2026-11-06'), [procedure, setProcedure] = useState(PROCEDURES[0]), [drafts, setDrafts] = useState({});
+  const [day, setDay] = useState(() => localCalendarDate()), [procedure, setProcedure] = useState(PROCEDURES[0]), [drafts, setDrafts] = useState({});
   const [message, setMessage] = useState(''), [photoBusy,setBusy] = useState(false), [angle,setAngle] = useState(ANGLES[0]);
   const [beforeId,setBeforeId] = useState(''), [afterId,setAfterId] = useState('');
   const [voiceBusy, setVoiceBusy] = useState(false);

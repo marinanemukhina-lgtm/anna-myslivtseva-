@@ -286,11 +286,33 @@ function Footer() {
   );
 }
 function HeroPortrait() {
-  const { data } = useSite();
+  const { data, motion, setMotion } = useSite();
   const p = data.profile;
   const custom = p.portrait && !["/media/anna-portrait.jpg", "/media/anna-portrait-smile.png"].includes(p.portrait);
+  const original = !p.heroPortrait && !custom;
   const src = p.heroPortrait || (custom ? p.portrait : "/media/anna-hero-petrol-clean-v1.png");
-  return <img className={"hero-image" + (!p.heroPortrait && !custom ? " hero-image--stock" : " hero-image--custom")} src={src} alt={p.name} loading="eager" fetchPriority="high" style={p.heroPortrait || custom ? { objectPosition: `50% ${p.heroPosition ?? 0}%` } : undefined} />;
+  const ref = useRef(null);
+  const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const video = ref.current;
+    if (!video || !original || failed) return;
+    let visible = true;
+    const sync = () => {
+      if (motion && visible && !document.hidden) video.play().catch(() => setReady(false));
+      else video.pause();
+    };
+    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; sync(); }, { threshold: 0.1 });
+    observer.observe(video);
+    document.addEventListener("visibilitychange", sync);
+    sync();
+    return () => { observer.disconnect(); document.removeEventListener("visibilitychange", sync); video.pause(); };
+  }, [motion, original, failed]);
+  return <div className="hero-portrait-stage">
+    <img className={"hero-image" + (original ? " hero-image--stock" : " hero-image--custom")} src={src} alt={p.name} loading="eager" fetchPriority="high" style={!original ? { objectPosition: `50% ${p.heroPosition ?? 0}%` } : undefined} />
+    {original && !failed && <video ref={ref} className={"hero-image hero-portrait-video" + (ready ? " is-ready" : "")} src="/media/anna-portrait-calm.mp4" poster="/media/anna-portrait-smile.png" muted loop playsInline preload={motion ? "auto" : "none"} aria-hidden="true" onPlaying={() => setReady(true)} onError={() => setFailed(true)} />}
+    {original && !failed && <button type="button" className="portrait-motion-toggle" onClick={() => setMotion(!motion)} aria-label={motion ? "Остановить анимацию портрета" : "Включить анимацию портрета"}><span aria-hidden="true">{motion ? "Ⅱ" : "▷"}</span><span>{motion ? "Пауза" : "Оживить портрет"}</span></button>}
+  </div>;
 }
 function Hero() {
   const { data } = useSite();

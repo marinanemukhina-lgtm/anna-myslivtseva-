@@ -16,13 +16,12 @@ function renderPortrait(profile, motion = true) {
   );
   return renderToStaticMarkup(React.createElement(HeroPortrait));
 }
-test('default portrait retains video, pause and editorial fallback; CMS portrait overrides video', () => {
+test('approved petrol portrait is never replaced by the legacy video; CMS portrait keeps priority', () => {
   const profile = { name: 'Анна', portrait: '/media/anna-portrait.jpg', heroPortrait: '' };
   const defaultHtml = renderPortrait(profile);
   assert.match(defaultHtml, /src="\/media\/anna-hero-petrol-clean-v1.png"/);
-  assert.match(defaultHtml, /src="\/media\/anna-portrait-calm.mp4"/);
-  assert.match(defaultHtml, /aria-label="Остановить анимацию портрета"/);
-  assert.match(renderPortrait(profile, false), /aria-label="Включить анимацию портрета"/);
+  assert.doesNotMatch(defaultHtml, /<video|poster=|portrait-motion-toggle|anna-portrait-calm|anna-portrait-smile/);
+  assert.equal(renderPortrait(profile, false), defaultHtml);
   const customHtml = renderPortrait({ ...profile, heroPortrait: '/media/anna-portrait-smile.png' });
   assert.match(customHtml, /src="\/media\/anna-portrait-smile.png"/);
   assert.doesNotMatch(customHtml, /<video|portrait-motion-toggle/);

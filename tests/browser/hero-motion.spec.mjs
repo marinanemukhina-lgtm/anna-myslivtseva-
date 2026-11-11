@@ -3,24 +3,24 @@ import { initialContent } from '../../shared/content.mjs';
 
 test.use({ reducedMotion: 'no-preference' });
 
-test('default hero keeps the live portrait, pause and a static fallback', async ({ page }) => {
+test('motion preference never substitutes the old portrait for the approved petrol photograph', async ({ page }) => {
+  const legacyRequests = [];
+  page.on('request', request => {
+    if (request.url().includes('anna-portrait-calm.mp4')) legacyRequests.push(request.url());
+  });
   await page.route('**/api/content', route => route.fulfill({ json: initialContent }));
   await page.route('**/api/contact/config', route => route.fulfill({ json: { enabled: false } }));
   await page.goto('/');
   const stage = page.locator('.hero-portrait-stage');
   const image = stage.locator('img');
-  const video = stage.locator('video');
   await expect(image).toHaveAttribute('src', '/media/anna-hero-petrol-clean-v1.png');
-  await expect(video).toHaveAttribute('src', '/media/anna-portrait-calm.mp4');
-  await expect(video).toHaveAttribute('poster', '/media/anna-portrait-smile.png');
-  const pause = stage.getByRole('button', { name: 'Остановить анимацию портрета' });
-  await expect(pause).toBeVisible();
-  await pause.click();
-  await expect(stage.getByRole('button', { name: 'Включить анимацию портрета' })).toBeVisible();
-  await video.dispatchEvent('error');
-  await expect(video).toHaveCount(0);
+  await expect(image).toHaveJSProperty('complete', true);
+  await expect(stage.locator('video')).toHaveCount(0);
   await expect(stage.getByRole('button')).toHaveCount(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await expect(image).toHaveAttribute('src', '/media/anna-hero-petrol-clean-v1.png');
   await expect(image).toBeVisible();
+  expect(legacyRequests).toEqual([]);
 });
 
 test('published custom portrait remains authoritative without the default video', async ({ page }) => {

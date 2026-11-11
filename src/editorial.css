@@ -10,8 +10,6 @@
 .hero-first { min-height: 760px; min-height: max(760px,calc(100svh - 110px)); padding: 190px 6vw 36px; justify-content: center; background: #bfc7c8; }
 .hero-portrait-stage { position: absolute; inset: 0; overflow: hidden; }
 .hero-first .hero-portrait-stage .hero-image { position: absolute; inset: 0; width: 100%; height: 100%; }
-.hero-first .hero-portrait-video.is-ready { opacity: 1; }
-.hero-first:has(.hero-portrait-video.is-ready) .hero-shade { background: linear-gradient(90deg,#f4f0e7 0%,#f4f0e7ed 26%,#f4f0e700 62%); }
 .hero-first .portrait-motion-toggle { z-index: 2; top: 24px; right: 2.25vw; }
 .hero-image { width: 100%; height: 100%; object-fit: cover; object-position: center center; }
 .hero-shade { background: none; pointer-events: none; }

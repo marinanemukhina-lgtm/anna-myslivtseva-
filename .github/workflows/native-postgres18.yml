@@ -1,0 +1,71 @@
+name: Synthetic native PostgreSQL 18 TLS checks
+on:
+  push:
+    branches: ["prep/anna-complete-contact-20261108"]
+  pull_request:
+    paths:
+      - '.github/workflows/native-postgres18.yml'
+      - 'server/postgres.mjs'
+      - 'server/storage-config.mjs'
+      - 'server/db.mjs'
+      - 'server/callbacks.mjs'
+      - 'tests/postgres-*.test.mjs'
+      - 'package*.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-postgres18:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Start isolated PostgreSQL 18 with ephemeral verified TLS fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/anna-pg18-tls"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout "$RUNNER_TEMP/anna-pg18-tls/server.key" \
+            -out "$RUNNER_TEMP/anna-pg18-tls/server.crt" \
+            -subj '/CN=localhost' \
+            -addext 'subjectAltName=DNS:localhost,IP:127.0.0.1' >/dev/null 2>&1
+          printf 'local all all trust\nhostssl all all 0.0.0.0/0 scram-sha-256\nhostnossl all all 0.0.0.0/0 reject\n' > "$RUNNER_TEMP/anna-pg18-tls/pg_hba.conf"
+          chmod 755 "$RUNNER_TEMP/anna-pg18-tls"
+          chmod 644 "$RUNNER_TEMP/anna-pg18-tls/server.crt" "$RUNNER_TEMP/anna-pg18-tls/pg_hba.conf"
+          chmod 600 "$RUNNER_TEMP/anna-pg18-tls/server.key"
+          sudo chown 70:70 "$RUNNER_TEMP/anna-pg18-tls/server.key"
+          docker run --detach --name anna-pg18-synthetic \
+            -p 127.0.0.1:55434:5432 \
+            -e POSTGRES_USER=adapter_synthetic \
+            -e POSTGRES_PASSWORD=adapter-synthetic-only \
+            -e POSTGRES_DB=adapter_synthetic \
+            -v "$RUNNER_TEMP/anna-pg18-tls:/fixture-tls:ro" \
+            postgres:18-alpine \
+            -c ssl=on -c ssl_cert_file=/fixture-tls/server.crt \
+            -c ssl_key_file=/fixture-tls/server.key -c hba_file=/fixture-tls/pg_hba.conf
+          ready=false
+          for attempt in $(seq 1 30); do
+            if docker exec anna-pg18-synthetic pg_isready -h 127.0.0.1 -p 5432 -U adapter_synthetic -d adapter_synthetic; then ready=true; break; fi
+            sleep 1
+          done
+          test "$ready" = true
+      - name: Verify native TLS adapter and real PostgreSQL 18 operations
+        shell: bash
+        env:
+          DATABASE_URL: ''
+          POSTGRES_NATIVE_TEST_ALLOW_WRITE: synthetic-only
+          POSTGRES_NATIVE_TEST_URL: postgresql://adapter_synthetic:adapter-synthetic-only@127.0.0.1:55434/adapter_synthetic
+        run: |
+          export POSTGRES_NATIVE_TEST_CA_PEM="$(cat "$RUNNER_TEMP/anna-pg18-tls/server.crt")"
+          npm run test:postgres:native
+      - name: Remove disposable synthetic service
+        if: always()
+        run: docker rm -f -v anna-pg18-synthetic || true

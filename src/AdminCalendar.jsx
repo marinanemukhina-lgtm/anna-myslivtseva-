@@ -2,11 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { bookingApi, dateInZone, formatAppointment, prepareScheduleDraft } from './booking-client.mjs';
 import './calendar.css';
 import AdminOccupancy from './AdminOccupancy.jsx';
+import AdminCalendarBoard from './AdminCalendarBoard.jsx';
+import {reservableSlot, makeReservationPayload} from './calendar-reservation.mjs';
 const weekdays = [[1, 'Понедельник'], [2, 'Вторник'], [3, 'Среда'], [4, 'Четверг'], [5, 'Пятница'], [6, 'Суббота'], [0, 'Воскресенье']];
-const monthBounds = month => {
-  const [year, number] = month.split('-').map(Number);
-  return { from: `${month}-01`, to: `${month}-${String(new Date(Date.UTC(year, number, 0)).getUTCDate()).padStart(2, '0')}` };
-};
 function Field({ label, value, onChange, type = 'text', min, max, hint, required = false }) {
   return <label className="admin-field"><span>{label}</span><input aria-label={label} type={type} value={value ?? ''} required={required} min={min} max={max} onChange={event => onChange(type === 'number' && event.target.value !== '' ? Number(event.target.value) : event.target.value)} />{hint && <small>{hint}</small>}</label>;
 }
@@ -24,7 +22,11 @@ function Windows({ value, onChange, label }) {
 export default function AdminCalendar({ temporaryCalendarAccess = false, services, onDirtyChange, onUnauthenticated, onSaved, onBusyChange }) {
   const [snapshot, setSnapshot] = useState(null), [settings, setSettings] = useState(null), [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false), [occupancyBusy, setOccupancyBusy] = useState(false), [error, setError] = useState(''), [notice, setNotice] = useState('');
-  const [month, setMonth] = useState(dateInZone('UTC').slice(0, 7)), [selectedDate, setSelectedDate] = useState('');
+  const [anchor, setAnchor] = useState(dateInZone('UTC')), [view, setView] = useState('month'), [selectedDate, setSelectedDate] = useState('');
+  const [occupancyRecords, setOccupancyRecords] = useState(null);
+  const [previewVersion,setPreviewVersion]=useState(null);
+  const [reserveBusy,setReserveBusy]=useState(false),[reserveUnknown,setReserveUnknown]=useState(false),[reserveError,setReserveError]=useState(''),[reserveNotice,setReserveNotice]=useState('');
+  const reserveLock=useRef(false),reservePending=useRef(null);
   const [previewService, setPreviewService] = useState(''), [previewSlots, setPreviewSlots] = useState([]), [previewTimezone, setPreviewTimezone] = useState(''), [previewReady, setPreviewReady] = useState(false), [previewValidity, setPreviewValidity] = useState(null), [slotsLoading, setSlotsLoading] = useState(false), [refresh, setRefresh] = useState(0);
   const lock = useRef(false);
   const handleError = err => { setError(err.message); if (err.status === 401) onUnauthenticated(); };
@@ -37,13 +39,13 @@ export default function AdminCalendar({ temporaryCalendarAccess = false, service
   };
   useEffect(() => { read(); }, []);
   useEffect(() => { onDirtyChange(dirty); return () => onDirtyChange(false); }, [dirty, onDirtyChange]);
-  useEffect(() => { onBusyChange(busy || occupancyBusy); return () => onBusyChange(false); }, [busy, occupancyBusy, onBusyChange]);
+  useEffect(() => { onBusyChange(busy || occupancyBusy || reserveBusy); return () => onBusyChange(false); }, [busy, occupancyBusy, reserveBusy, onBusyChange]);
   useEffect(() => {
-    setPreviewSlots([]); setPreviewTimezone(''); setPreviewReady(false); setPreviewValidity(null); setSlotsLoading(false);
+    setPreviewSlots([]); setPreviewTimezone(''); setPreviewReady(false); setPreviewVersion(null); setPreviewValidity(null); setSlotsLoading(false);
     if (temporaryCalendarAccess || snapshot?.temporaryCalendarAccess || !previewService || !selectedDate || dirty) return;
     const controller = new AbortController(); setSlotsLoading(true);
     bookingApi(`/api/admin/booking/free-availability?${new URLSearchParams({ serviceId: previewService, date: selectedDate })}`, { signal: controller.signal })
-      .then(value => { if (controller.signal.aborted) return; setPreviewSlots(value.slots); setPreviewTimezone(value.timezone || ''); setPreviewReady(value.ready === true && Date.parse(value.validUntil) > Date.now()); setPreviewValidity(value.observedAt && value.validUntil ? {observedAt:value.observedAt,validUntil:value.validUntil} : null); }).catch(err => { if (err.name !== 'AbortError') handleError(err); })
+      .then(value => { if (controller.signal.aborted) return; setPreviewSlots(value.slots); setPreviewTimezone(value.timezone || ''); setPreviewVersion(Number.isSafeInteger(value.version)?value.version:null); setPreviewReady(value.ready === true && Date.parse(value.validUntil) > Date.now()); setPreviewValidity(value.observedAt && value.validUntil ? {observedAt:value.observedAt,validUntil:value.validUntil} : null); }).catch(err => { if (err.name !== 'AbortError') handleError(err); })
       .finally(() => { if (!controller.signal.aborted) setSlotsLoading(false); });
     return () => controller.abort();
   }, [temporaryCalendarAccess, snapshot?.temporaryCalendarAccess, previewService, selectedDate, dirty, refresh]);
@@ -56,7 +58,7 @@ export default function AdminCalendar({ temporaryCalendarAccess = false, service
   }, [previewReady, previewValidity]);
   function edit(update) { setSettings(current => { const next = structuredClone(current); update(next); return next; }); setDirty(true); setNotice(''); }
   async function save(event) {
-    event.preventDefault(); if (lock.current || occupancyBusy) return;
+    event.preventDefault(); if (lock.current || occupancyBusy || reserveBusy || reserveUnknown) return;
     setError(''); setNotice('');
     let validated;
     try {
@@ -70,13 +72,64 @@ export default function AdminCalendar({ temporaryCalendarAccess = false, service
     } catch (err) { handleError(err); }
     finally { lock.current = false; setBusy(false); }
   }
+  async function reserveSlot(slot){
+    if(reserveLock.current||reserveUnknown||reserveBusy||busy||occupancyBusy||dirty||!previewReady||!previewService||!selectedDate||!previewVersion)return;
+    if(!window.confirm('Создать внутренний резерв на '+formatAppointment(slot.start,previewTimezone||settings.timezone)+'? Это НЕ запись пациента и не отправляет уведомлений.'))return;
+    reserveLock.current=true;setReserveBusy(true);setReserveError('');setReserveNotice('');
+    try{
+      const url='/api/admin/booking/free-availability?'+new URLSearchParams({serviceId:previewService,date:selectedDate});
+      const current=await bookingApi(url);
+      if(!reservableSlot(current,slot.start)||current.version!==previewVersion||current.timezone!==previewTimezone){
+        setReserveError('Расписание или занятость изменились. Обновите свободное время и проверьте его заново. Резерв не создан.');
+        setRefresh(value=>value+1);return;
+      }
+      const body=makeReservationPayload(current,previewService,selectedDate,slot.start,crypto.randomUUID().replaceAll('-',''));
+      reservePending.current=body;
+      const receipt=await bookingApi('/api/admin/booking/reservations',{method:'POST',body});
+      if(!receipt.records?.some(record=>record.operationKey===body.operationKey&&record.type==='reservation'&&record.status==='active')){
+        setReserveUnknown(true);setReserveError('Сервер не подтвердил резерв. Проверьте результат перед дальнейшими действиями.');return;
+      }
+      reservePending.current=null;setReserveUnknown(false);
+      setReserveNotice('Внутренний резерв подтверждён сервером. Это не запись клиента.');setRefresh(v=>v+1);
+      if(receipt.rebasedFromVersion===body.expectedVersion&&receipt.version===body.expectedVersion+1&&receipt.settings){
+        setSnapshot(prev=>prev&&prev.version===body.expectedVersion?{...prev,version:receipt.version,settings:receipt.settings}:prev);
+        onSaved?.(body.expectedVersion,receipt);
+      }
+    }catch(err){
+      if(reservePending.current&&(!err.status||err.status>=500)){
+        setReserveUnknown(true);
+        setReserveError('Результат создания резерва неизвестен. Не повторяйте действие: сначала проверьте занятость.');
+      }else{
+        reservePending.current=null;
+        if(err.status===401)onUnauthenticated?.();
+        setReserveError(err.status===409?'Время уже занято или расписание изменилось. Проверьте занятость и обновите расчёт.':(err.message||'Не удалось создать резерв.'));
+        setRefresh(v=>v+1);
+      }
+    }finally{reserveLock.current=false;setReserveBusy(false);}
+  }
+  async function checkUnknownReservation(){
+    if(reserveLock.current||!reservePending.current||!reserveUnknown)return;
+    reserveLock.current=true;setReserveBusy(true);
+    try{
+      const result=await bookingApi('/api/admin/booking/occupancy');
+      const match=result.occupancy?.records?.find(r=>r.operationKey===reservePending.current.operationKey&&r.type==='reservation'&&r.status==='active');
+      if(match){
+        reservePending.current=null;setReserveUnknown(false);setReserveError('');
+        setReserveNotice('Резерв найден в сохранённой занятости. Проверьте календарь.');setRefresh(v=>v+1);
+        setSnapshot(prev=>prev?{...prev,version:result.version,settings:result.settings||prev.settings}:prev);
+      }else{
+        setReserveError('Резерв пока не найден. Результат остаётся неизвестным; не создавайте повторный резерв без дополнительной проверки.');
+      }
+    }catch(err){
+      if(err.status===401)onUnauthenticated?.();
+      setReserveError('Проверка резерва не удалась. Не повторяйте резервирование до проверки занятости.');
+    }finally{reserveLock.current=false;setReserveBusy(false);}
+  }
   if (!settings) return <section className="admin-card">{error ? <><p role="alert" className="admin-error">{error}</p><button type="button" className="text-button" onClick={read}>Повторить загрузку</button></> : <p role="status">Загрузка календаря…</p>}</section>;
   const limited = temporaryCalendarAccess || snapshot.temporaryCalendarAccess;
   const catalog = snapshot.serviceCatalog || services;
   const override = settings.overrides.find(item => item.date === selectedDate);
   const overrideMode = !override ? 'weekly' : override.closed ? 'closed' : 'custom';
-  const days = monthBounds(month).to.slice(-2) * 1;
-  const offset = (new Date(`${month}-01T12:00:00Z`).getUTCDay() + 6) % 7;
   const updateOverride = (mode, windows = []) => edit(next => { next.overrides = next.overrides.filter(item => item.date !== selectedDate); if (mode !== 'weekly') next.overrides.push({ date: selectedDate, closed: mode === 'closed', windows: mode === 'closed' ? [] : windows }); });
   return <div className="admin-calendar">
     {error && <div className="admin-alert admin-error" role="alert">{error}{dirty && <button type="button" className="text-button" onClick={() => { if (confirm('Загрузить сохранённое расписание? Несохранённые изменения будут потеряны.')) read(); }}>Загрузить сохранённое расписание</button>}</div>}
@@ -103,28 +156,29 @@ export default function AdminCalendar({ temporaryCalendarAccess = false, service
         </section>
         <section className="admin-card"><h2>Обычная неделя</h2><p className="calendar-hint">Оставьте выходные без интервалов. Если приём только в отдельные дни, оставьте всю неделю закрытой и откройте нужные даты ниже.</p><div className="calendar-week">{weekdays.map(([day, label]) => <Windows key={day} label={label} value={settings.weeklyHours[day] || []} onChange={value => edit(next => { next.weeklyHours[day] = value; })} />)}</div></section>
         <section className="admin-card"><h2>Отдельные дни</h2><p className="calendar-hint">Выберите дату, чтобы закрыть её или оставить только удобные часы. Эти правила заменяют обычную неделю только для выбранной даты.</p>
-          <Field label="Месяц календаря" type="month" value={month} onChange={value => { if (/^\d{4}-\d{2}$/.test(value)) { setMonth(value); setSelectedDate(''); } }} />
-          <div className="calendar-month" role="group" aria-label="Дни месяца">{['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map(day => <span className="calendar-weekday" key={day}>{day}</span>)}{Array.from({ length: offset }, (_, index) => <span key={`empty-${index}`} />)}{Array.from({ length: days }, (_, index) => {
-            const date = `${month}-${String(index + 1).padStart(2, '0')}`, rule = settings.overrides.find(item => item.date === date);
-            const day = new Date(`${date}T12:00:00Z`).getUTCDay(), open = rule ? !rule.closed && rule.windows.length > 0 : !!settings.weeklyHours[day]?.length;
-            return <button type="button" key={date} aria-pressed={selectedDate === date} aria-label={`${date}, ${open ? 'приём открыт' : 'выходной'}`} className={open ? 'calendar-day open' : 'calendar-day'} onClick={() => setSelectedDate(date)}><strong>{index + 1}</strong><small>{open ? 'Приём' : 'Закрыто'}</small></button>;
-          })}</div>
-          <Field label="Выбранная дата" type="date" value={selectedDate} onChange={value => { setSelectedDate(value); if (value) setMonth(value.slice(0, 7)); }} />
+          <Field label="Месяц календаря" type="month" value={anchor.slice(0,7)} onChange={value=>{if(/^\d{4}-\d{2}$/.test(value)){setAnchor(value+'-01');setView('month');setSelectedDate('');}}}/>
+          <AdminCalendarBoard anchor={anchor} view={view} selectedDate={selectedDate} settings={settings} timezone={settings.timezone}
+            occupancy={limited || dirty || busy || occupancyBusy ? null : occupancyRecords}
+            onNavigate={date=>{setAnchor(date);setSelectedDate('');}} onSelectDate={date=>{setSelectedDate(date);setAnchor(date);}} onChangeView={setView}/>
+          <Field label="Выбранная дата" type="date" value={selectedDate} onChange={value=>{setSelectedDate(value);if(value)setAnchor(value);}} />
           {selectedDate && <div className="calendar-date-editor"><label className="admin-field"><span>Режим дня</span><select value={overrideMode} onChange={event => updateOverride(event.target.value)}><option value="weekly">По обычной неделе</option><option value="closed">Выходной: закрыть день</option><option value="custom">Только выбранные часы</option></select></label>{overrideMode === 'custom' && <Windows label={`Приём ${selectedDate}`} value={override.windows} onChange={value => updateOverride('custom', value)} />}</div>}
         </section>
         <div className="calendar-save"><span>{dirty ? 'Расписание ещё не сохранено' : 'Расписание сохранено'}</span><button type="submit" className="admin-primary" disabled={!dirty || busy || occupancyBusy}>{busy ? 'Сохраняем…' : 'Сохранить расписание'}</button></div>
       </fieldset>
     </form>
     {limited ? <section className="admin-card"><h2>Доступны только рабочие часы</h2><p>Это открытый редактор расписания: любой посетитель может менять часы, длительность услуг и отдельные даты. Занятость, импорт и проверка свободного времени доступны только владельцу по паролю. Рабочие часы не означают, что время свободно. Онлайн-запись закрыта.</p></section> : <>
-    <section className="admin-card calendar-preview"><h2>Проверить свободное время</h2><p className="calendar-hint">Расчёт по сохранённым часам и сверенной занятости, с учётом перерывов. Это не запись: клиентские данные не собираются, время не бронируется.</p>
+    <section className="admin-card calendar-preview"><h2>Проверить свободное время</h2><p className="calendar-hint">Расчёт по сохранённым часам и сверенной занятости. Это не запись пациента: клиентские данные не собираются, время не бронируется автоматически. Владелец может отдельно подтвердить внутренний резерв без персональных данных.</p>
       <label className="admin-field"><span>Услуга для проверки</span><select value={previewService} onChange={event => setPreviewService(event.target.value)}><option value="">Выберите услугу</option>{catalog.filter(service => service.published && settings.services.some(item => item.serviceId === service.id && item.enabled)).map(service => <option key={service.id} value={service.id}>{service.title}</option>)}</select></label>
       <p className="calendar-hint">Дата: {selectedDate || 'выберите день в календаре выше'}. Часовой пояс: {previewTimezone || settings.timezone || 'не задан'}.</p>
       {previewValidity && <p className="calendar-hint">Последняя проверка: {previewValidity.observedAt} (UTC). Перед выбором времени обновите расчёт.</p>}
       <button type="button" className="text-button" disabled={slotsLoading || dirty || !previewService || !selectedDate} onClick={() => setRefresh(current => current + 1)}>Обновить расчёт</button>
+      {reserveError && <p className="calendar-warning" role="alert">{reserveError}</p>}
+      {reserveNotice && <p className="admin-alert success" role="status">{reserveNotice}</p>}
+      {reserveUnknown && <button type="button" className="text-button" disabled={reserveBusy} onClick={checkUnknownReservation}>Проверить результат резерва</button>}
       {previewTimezone && previewTimezone !== settings.timezone && <div className="calendar-warning" role="alert">Часовой пояс был изменён в другой вкладке. Предпросмотр показан в {previewTimezone}. <button type="button" className="text-button" onClick={read}>Загрузить сохранённое расписание</button></div>}
-      {dirty ? <p>Сначала сохраните расписание, чтобы проверить время.</p> : slotsLoading ? <p role="status">Рассчитываем время…</p> : !previewService || !selectedDate ? <p>Выберите услугу и дату.</p> : !previewReady ? <p>Свободное время пока нельзя подтвердить. Проверьте опубликованную услугу, рабочие часы и актуальность сверенной занятости за выбранный период.</p> : previewSlots.length ? <ul className="calendar-preview-slots">{previewSlots.map(slot => <li key={slot.start}>{formatAppointment(slot.start, previewTimezone || settings.timezone)}</li>)}</ul> : <p>На эту дату нет доступных интервалов. Проверьте часы, длительность услуги и минимальное время до приёма.</p>}
+      {dirty ? <p>Сначала сохраните расписание, чтобы проверить время.</p> : slotsLoading ? <p role="status">Рассчитываем время…</p> : !previewService || !selectedDate ? <p>Выберите услугу и дату.</p> : !previewReady ? <p>Свободное время пока нельзя подтвердить. Проверьте опубликованную услугу, рабочие часы и актуальность сверенной занятости за выбранный период.</p> : previewSlots.length ? <ul className="calendar-preview-slots">{previewSlots.map(slot => <li key={slot.start}><span>{formatAppointment(slot.start, previewTimezone || settings.timezone)}</span><button type="button" className="text-button" disabled={reserveBusy||reserveUnknown||busy||occupancyBusy||dirty||!previewVersion} onClick={()=>reserveSlot(slot)}>Внутренний резерв</button></li>)}</ul> : <p>На эту дату нет доступных интервалов. Проверьте часы, длительность услуги и минимальное время до приёма.</p>}
     </section>
-    <AdminOccupancy key={snapshot.version} blocked={dirty || busy} onUnauthenticated={onUnauthenticated} onBusyChange={setOccupancyBusy} onSaved={(previousVersion, saved) => {
+    <AdminOccupancy key={snapshot.version} blocked={dirty || busy || reserveBusy || reserveUnknown} onUnauthenticated={onUnauthenticated} onBusyChange={setOccupancyBusy} onSnapshot={value=>setOccupancyRecords(value?.occupancy?.records??null)} onSaved={(previousVersion, saved) => {
       setSnapshot(current => current && current.version === previousVersion ? {...current, version:saved.version, settings:saved.settings || current.settings} : current);
       setRefresh(current => current + 1);
       if (saved.settings) onSaved?.(previousVersion, saved);

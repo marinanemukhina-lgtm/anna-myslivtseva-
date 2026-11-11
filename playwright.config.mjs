@@ -4,7 +4,7 @@ export default defineConfig({
   workers: 1,
   maxFailures: 1,
   timeout: 45000,
-  use: { baseURL: 'http://127.0.0.1:4176', reducedMotion: 'reduce', trace: 'retain-on-failure' },
+  use: { ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH ? { launchOptions: { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH } } : {}), baseURL: 'http://127.0.0.1:4176', reducedMotion: 'reduce', trace: 'retain-on-failure' },
   outputDir: '.qa/browser',
   reporter: [['list'], ['html', { outputFolder: '.qa/report', open: 'never' }]],
   projects: [

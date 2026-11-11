@@ -42,11 +42,20 @@ for (const [width, height] of [[320, 740], [390, 844], [1440, 960]]) {
       const box = await link.boundingBox();
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(width);
-      expect(box.y + box.height).toBeLessThanOrEqual(height);
+      await link.scrollIntoViewIfNeeded();
+      expect((await link.boundingBox()).y + (await link.boundingBox()).height).toBeLessThanOrEqual(height);
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await expect(page.locator('.motion-off')).toHaveCount(1);
-    expect(await page.locator('.hero-portrait-video').evaluate(video => video.paused)).toBe(true);
+    await expect(page.locator('.hero-portrait-stage img.hero-image')).toHaveJSProperty('complete', true);
+    await expect(page.locator('.hero-portrait-stage img.hero-image')).toHaveAttribute('src', '/media/anna-hero-petrol-clean-v1.png');
+    await expect(page.locator('.hero-portrait-stage video')).toHaveCount(0);
+    await expect(page.locator('.hero-portrait-stage button')).toHaveCount(0);
+    await page.evaluate(()=>scrollTo(0,0));
+    const primary = page.locator(width <= 700 ? '.header-contact' : '.hero-contact');
+    await expect(primary).toBeVisible();
+    const primaryBox = await primary.boundingBox();
+    expect(primaryBox.y + primaryBox.height).toBeLessThanOrEqual(height);
     await page.locator('.hero-contact').focus();
     await page.keyboard.press('Tab');
     await expect(page.locator('.hero-services')).toBeFocused();
@@ -59,10 +68,13 @@ for (const [width, height] of [[320, 740], [390, 844], [1440, 960]]) {
     await page.goBack();
     await expect(page.locator('.hero-contact')).toBeVisible();
     await page.locator('.hero-contact').click();
-    await expect(page.locator('.contact-intro a[href="tel:+79000000001"]')).toBeVisible();
-    await expect(page.locator('.contact-intro a[href="sms:+79000000001"]')).toBeVisible();
+    const chooser = page.getByRole('dialog',{name:'Связаться с Анной'});
+    await expect(chooser).toBeVisible();
+    await expect(chooser.getByRole('link',{name:'Позвонить Анне'})).toHaveAttribute('href','tel:+79000000001');
+    await expect(chooser.getByRole('link',{name:'Написать SMS Анне'})).toHaveAttribute('href','sms:+79000000001');
     await expect(page.locator('form, input[type="tel"]')).toHaveCount(0);
-    await page.goBack();
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.hero-contact')).toBeFocused();
     const menu = page.getByRole('button', { name: 'Меню', exact: true });
     await menu.click();
     await expect(page.getByRole('dialog', { name: 'Главное меню' }).getByRole('button', { name: 'Закрыть', exact: true })).toBeFocused();
@@ -83,10 +95,13 @@ test('empty CMS fields do not invent a location or a contact destination', async
   await gotoHydratedHome(page);
   await expect(page.locator('.hero-location')).toHaveCount(0);
   await expect(page.locator('.hero-services')).toHaveCount(0);
-  await expect(page.locator('.hero-contact')).toHaveAttribute('href', '/contact');
+  await expect(page.locator('.hero-contact')).toHaveRole('button');
   await page.locator('.hero-contact').click();
-  await expect(page.locator('.contact-intro')).toContainText('Телефон для связи пока не опубликован.');
-  await expect(page.locator('.contact-intro a, form, input[type="tel"]')).toHaveCount(0);
+  const chooser = page.getByRole('dialog',{name:'Связаться с Анной'});
+  await expect(chooser).toContainText('Контакты пока не опубликованы');
+  await expect(chooser.locator('a, form, input[type="tel"]')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.hero-contact')).toBeFocused();
 });
 
 
@@ -98,7 +113,7 @@ test('published location with no services keeps contact and ordinary navigation'
   await expect(page.locator('.hero-contact')).toBeVisible();
   await expect(page.locator('.hero-document-link')).toBeVisible();
   await page.locator('.hero-chapters a[href="/services"]').click();
-  await expect(page.getByText('Перечень услуг и цены скоро появятся.')).toBeVisible();
+  await expect(page.locator('.services-editorial__empty')).toBeVisible();
 });
 
 test('service without price does not promise a price in the hero action', async ({ page }) => {

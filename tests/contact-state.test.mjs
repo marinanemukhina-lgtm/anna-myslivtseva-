@@ -82,7 +82,7 @@ for (const [name, profile, href] of [
     const html = renderContact(profile);
     assert.ok(html.includes(`href="${href}"`));
     assert.ok(!html.includes('Контакты для записи скоро появятся.'));
-    assert.ok(html.includes(availableMessage));
+    assert.ok(!html.includes("Онлайн-календарь пока не открыт"));
     assert.ok(!html.includes(unavailableMessage));
     assert.ok(!html.includes('<form'));
   });
@@ -94,8 +94,8 @@ for (const [name, profile] of [
 ]) {
   test(`contact integration: ${name} does not suggest unavailable contact methods`, () => {
     const html = renderContact(profile);
-    assert.ok(html.includes(unavailableMessage));
-    assert.ok(html.includes('Контакты для записи скоро появятся.'));
+    assert.ok(html.includes("Телефон для связи пока не опубликован."));
+    assert.ok(!html.includes("Онлайн-календарь пока не открыт"));
     assert.ok(!html.includes(availableMessage));
     assert.ok(!html.includes('href="tel:'));
     assert.ok(!html.includes('href="mailto:'));

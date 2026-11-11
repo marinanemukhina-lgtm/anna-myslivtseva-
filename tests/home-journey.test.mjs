@@ -8,6 +8,25 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { loadComponent } from "./load-contact-component.mjs";
 const { ContactChoiceDialog } = loadComponent("ContactChoiceDialog.jsx");
 const source = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+const portraitSource = source.slice(source.indexOf('function HeroPortrait()'), source.indexOf('function Hero()'));
+const portraitCompiled = await transform(portraitSource, { loader: 'jsx' });
+function renderPortrait(profile, motion = true) {
+  const HeroPortrait = new Function('React', 'useSite', 'useRef', 'useState', 'useEffect', portraitCompiled.code + ';return HeroPortrait;')(
+    React, () => ({ data: { profile }, motion, setMotion: () => {} }), React.useRef, React.useState, React.useEffect,
+  );
+  return renderToStaticMarkup(React.createElement(HeroPortrait));
+}
+test('default portrait retains video, pause and editorial fallback; CMS portrait overrides video', () => {
+  const profile = { name: 'Анна', portrait: '/media/anna-portrait.jpg', heroPortrait: '' };
+  const defaultHtml = renderPortrait(profile);
+  assert.match(defaultHtml, /src="\/media\/anna-hero-petrol-clean-v1.png"/);
+  assert.match(defaultHtml, /src="\/media\/anna-portrait-calm.mp4"/);
+  assert.match(defaultHtml, /aria-label="Остановить анимацию портрета"/);
+  assert.match(renderPortrait(profile, false), /aria-label="Включить анимацию портрета"/);
+  const customHtml = renderPortrait({ ...profile, heroPortrait: '/media/anna-portrait-smile.png' });
+  assert.match(customHtml, /src="\/media\/anna-portrait-smile.png"/);
+  assert.doesNotMatch(customHtml, /<video|portrait-motion-toggle/);
+});
 const hero = source.slice(source.indexOf('function Hero()'), source.indexOf('function Intro()'));
 const compiled = await transform(hero, { loader: 'jsx' });
 function render(address, services = []) {

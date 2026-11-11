@@ -47,8 +47,10 @@ for (const [width, height] of [[320, 740], [390, 844], [1440, 960]]) {
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     await expect(page.locator('.motion-off')).toHaveCount(1);
-    await expect(page.locator('.hero-image')).toHaveJSProperty('complete', true);
-    await expect(page.locator('.hero-portrait-video')).toHaveCount(0);
+    await expect(page.locator('.hero-portrait-stage img.hero-image')).toHaveJSProperty('complete', true);
+    await expect(page.locator('.hero-portrait-video')).toHaveAttribute('src', '/media/anna-portrait-calm.mp4');
+    await expect(page.locator('.hero-portrait-video')).toHaveAttribute('preload', 'none');
+    await expect(page.getByRole('button', { name: 'Включить анимацию портрета' })).toBeVisible();
     await page.evaluate(()=>scrollTo(0,0));
     const primary = page.locator(width <= 700 ? '.header-contact' : '.hero-contact');
     await expect(primary).toBeVisible();

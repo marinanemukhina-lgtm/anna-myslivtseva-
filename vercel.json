@@ -50,7 +50,8 @@
       "feat/anna-contact-flows-20261107": false,
       "prep/anna-russian-postgres-20261107": false,
       "prep/anna-callback-integration-20261108": false,
-      "prep/anna-complete-contact-20261108": false
+      "prep/anna-complete-contact-20261108": false,
+      "integration/anna-editorial-calendar-20261111": false
     }
   }
 }

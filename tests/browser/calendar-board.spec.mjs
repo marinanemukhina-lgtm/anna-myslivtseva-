@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';
+test('owner calendar switches month/week, navigates over boundaries and retains selected date',async({page})=>{
+ await page.goto('/admin');
+ await page.getByLabel('Пароль',{exact:true}).fill('browser-fixture-only-password');
+ await page.getByRole('button',{name:'Войти',exact:true}).click();
+ await expect(page.getByLabel('Специализация',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Календарь и запись',exact:true}).click();
+ await expect(page.getByRole('group',{name:'Вид календаря'})).toBeVisible();
+ await page.getByRole('button',{name:'Неделя',exact:true}).click();
+ const week=page.getByRole('group',{name:/Дни календаря/});
+ await expect(week.getByRole('button')).toHaveCount(7);
+ await page.getByLabel('Выбранная дата',{exact:true}).fill('2026-12-31');
+ await expect(week.getByRole('button',{name:/2026-12-31/})).toBeVisible();
+ await page.getByRole('button',{name:'Следующий период'}).click();
+ await expect(week.getByRole('button',{name:/2027-01-04/})).toBeVisible();
+ await page.getByRole('button',{name:'Месяц',exact:true}).click();
+ await expect(page.getByRole('group',{name:/Дни календаря/}).getByRole('button')).toHaveCount(31);
+ await expect(page.getByRole('button',{name:'Сохранить расписание'})).toBeDisabled();
+ await page.screenshot({path:test.info().outputPath('calendar-board.png'),fullPage:true});
+});

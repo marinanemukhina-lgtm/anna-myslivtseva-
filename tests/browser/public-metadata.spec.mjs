@@ -68,7 +68,8 @@ test('returning to the entry page restores its server metadata when the initial 
   await expect(page.getByRole('status')).toContainText('Не удалось обновить');
   const title = await page.title();
   const description = await page.locator('meta[name="description"]').getAttribute('content');
-  await page.getByRole('link',{name:'Новости',exact:true}).last().click();
+  await page.getByRole('button',{name:'Меню',exact:true}).click();
+  await page.getByRole('dialog',{name:'Главное меню'}).getByRole('link',{name:/Новости/}).click();
   await expect(page).toHaveURL(/\/news$/);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content','noindex, follow');
   await page.goBack();

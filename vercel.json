@@ -33,6 +33,10 @@
       "dest": "/api"
     },
     {
+      "src": "/sitemap\\.xml",
+      "dest": "/api"
+    },
+    {
       "handle": "filesystem"
     },
     {
@@ -46,7 +50,8 @@
       "prep/synthetic-unified-booking-20261106": false,
       "fix/anna-clinical-reliability-20261107": false,
       "feat/anna-direct-contact-20261107": false,
-      "feat/anna-unified-contact-20261107": false
+      "feat/anna-unified-contact-20261107": false,
+      "fix/anna-seo-audit-20261118": false
     }
   }
 }

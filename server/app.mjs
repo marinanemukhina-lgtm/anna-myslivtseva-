@@ -1,4 +1,5 @@
 import express from "express";
+import { registerSeo } from "./seo.mjs";
 import { registerMarketing } from "./marketing.mjs";
 import { registerPrivateBooking } from "./booking-occupancy.mjs";
 import { registerPublicPages } from "./public-pages.mjs";
@@ -341,6 +342,7 @@ export function createApp() {
   registerBookingPreparation(app, requireAdmin, requireCalendarAccess);
   registerMarketing(app, requireAdmin, requireContentAccess);
   registerPrivateBooking(app, requireAdmin);
+  registerSeo(app);
   registerPublicPages(app);
   app.use("/api", (_req, res) =>
     res.status(404).json({ error: "Страница не найдена." }),

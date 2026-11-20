@@ -14,6 +14,7 @@ import { initialContent } from "../shared/content.mjs";
 import Admin from "./Admin.jsx";
 import Booking from "./Booking.jsx";
 import ContactActions from "./ContactActions.jsx";
+import ContactQuestions from "./ContactQuestions.jsx";
 import SocialLinks from "./SocialLinks.jsx";
 import { contactMethods } from "./contact-methods.mjs";
 import { publicSocialLinks, safePublicUrl } from "../shared/contact-links.mjs";
@@ -887,6 +888,7 @@ function Contact() {
           ) : null}
         </div>
       </section>
+      <ContactQuestions data={data} Link={Link} />
     </>
   );
 }

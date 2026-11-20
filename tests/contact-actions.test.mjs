@@ -66,3 +66,61 @@ test('published socials are explicit channel links, not personal chat promises',
   assert.doesNotMatch(html, /Написать Анне|Личный чат/);
   assert.doesNotMatch(render({socialLinks:{telegram:'javascript:alert(1)'}}), /javascript:/);
 });
+
+const questionsSource = await readFile(new URL("../src/ContactQuestions.jsx", import.meta.url), "utf8");
+const questionsCompiled = await transform(questionsSource, { loader: "jsx", format: "cjs" });
+const faqModule = { exports: {} };
+new Function("require", "module", "exports", questionsCompiled.code)((name) => {
+  switch (name) {
+    case "react": return React;
+    case "./contact-methods.mjs": return { contactMethods };
+    default: throw new Error("Unexpected module: " + name);
+  }
+}, faqModule, faqModule.exports);
+const renderQuestions = (data = {}) => renderToStaticMarkup(React.createElement(faqModule.exports.default, {
+  data,
+  Link: ({ to, children, ...props }) => React.createElement("a", { href: to, ...props }, children),
+}));
+
+test("visitor questions use published contact details, known location and supported actions", () => {
+  const html = renderQuestions({
+    profile: { phone: "+7 (900) 000-00-01", address: "Ростов-на-Дону. Выезд на дом по предварительной записи." },
+    services: [{ published: true, price: "5000 ₽" }],
+    diplomas: [{ published: true, title: "Документ из CMS" }],
+  });
+  assert.match(html, /<details><summary>Как записаться/);
+  assert.match(html, /href="#contact-title"/);
+  assert.match(html, /позвоните Анне или напишите SMS/);
+  assert.doesNotMatch(html, /href="(?:tel:|sms:)|79000000001/);
+  assert.match(html, /Выезд на дом в Ростове-на-Дону возможен по предварительной записи/);
+  assert.match(html, /href="\/services"/);
+  assert.match(html, /href="\/diplomas"/);
+  assert.doesNotMatch(html, /<form|<input|5000 ₽|Документ из CMS|\/api\//);
+});
+
+test("visitor questions omit unsupported contact methods and distinguish empty or unpublished data", () => {
+  const empty = renderQuestions({
+    profile: { phone: "javascript:invalid", address: "Другой город", bookingUrl: "https://example.test" },
+    services: [{ published: false, price: "5000 ₽" }],
+    diplomas: [{ published: false, title: "Личный документ" }],
+  });
+  assert.doesNotMatch(empty, /href="(?:tel:|sms:)|Ростов-на-Дону|Выезд на дом|5000 ₽|Личный документ|example.test/);
+  assert.match(empty, /Посмотрите доступные способы связи/);
+  assert.match(empty, /href="\/services"/);
+  assert.match(empty, /href="\/diplomas"/);
+  assert.doesNotMatch(empty, /пока не опубликован/);
+  const partial = renderQuestions({
+    profile: { phone: "+74950000000", address: "Ростов-на-Дону." },
+    services: [{ published: true, price: " " }, { published: false, price: "5000 ₽" }],
+  });
+  assert.match(partial, /позвоните Анне/);
+  assert.doesNotMatch(partial, /напишите SMS|Выезд на дом|74950000000/);
+  assert.match(partial, /Если цена опубликована/);
+});
+
+test("visitor questions live on the existing contact route without a new collection flow", async () => {
+  const app = await readFile(new URL("../src/App.jsx", import.meta.url), "utf8");
+  const contact = app.slice(app.indexOf("function Contact()"), app.indexOf("function Legal("));
+  assert.match(contact, /<ContactQuestions data=\{data\} Link=\{Link\} \/>/);
+  assert.doesNotMatch(questionsSource, /fetch\s*\(|XMLHttpRequest|sendBeacon|localStorage|sessionStorage|\/api\//);
+});

@@ -31,3 +31,15 @@
 .social-links .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .contacts.compact a:focus-visible { outline-color: #a8b7d8; }
+
+.contact-questions { padding-block: clamp(45px, 7vw, 96px); }
+.contact-questions > h2 { grid-column: 1 / 6; font-size: clamp(32px, 4vw, 60px); }
+.contact-questions > div { grid-column: 7 / 12; min-width: 0; }
+.contact-questions details { border-bottom: 1px solid currentColor; }
+.contact-questions summary { padding: 13px 0; min-height: 44px; cursor: pointer; font-weight: 600; }
+.contact-questions p { margin: 0 0 16px; line-height: 1.6; }
+.contact-questions p a { text-decoration: underline; text-underline-offset: 3px; }
+.contact-questions summary:focus-visible, .contact-questions a:focus-visible { outline: 3px solid #516db0; outline-offset: 3px; }
+@media (max-width: 900px) {
+  .contact-questions > h2, .contact-questions > div { grid-column: 1 / -1; }
+}
